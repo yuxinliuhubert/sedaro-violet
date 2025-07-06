@@ -2,7 +2,7 @@ from flask import Flask, jsonify, request, render_template_string
 from sedaro import SedaroApiClient
 from pprint import pprint
 import json
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 
 API_KEY = "PKDqMrtcTK4plJgL7qVlQD.0xQph1lyKzd-pV0-ZL7bRIH7BX54Yjqbz6tluwut3Hvp8XE-RVbfHSz2o5vC77scUhg2xBFuBybplxY6FyXXMQ"
 TEMP_AGENT_REPO_BRANCH_ID = "PS5ZPCp6mh5yXLH3lkCWFj" # Specific Repo of the Templated agent 
@@ -106,72 +106,211 @@ def discover_blocks() -> Dict[str, List[Dict[str, Any]]]:
     
     return blocks_by_type
 
-def get_block_properties(block_id: str) -> Dict[str, Any]:
+def get_agent_template_structure() -> Dict[str, Any]:
     """
-    Get properties of a specific block
+    Get the complete structure of the agent template data for dropdown exploration
     """
     try:
-        block = agent_template_branch.block(block_id)
-        block_data = block.data
-        # Filter out internal fields and return editable properties
-        return {k: v for k, v in block_data.items() if not k.startswith('_')}
+        agent_data = agent_template_branch.data
+        return {
+            'success': True,
+            'data': agent_data,
+            'keys': list(agent_data.keys()) if isinstance(agent_data, dict) else []
+        }
     except Exception as e:
-        return {'error': str(e)}
+        return {
+            'success': False,
+            'error': str(e)
+        }
 
-def get_all_block_ids() -> List[str]:
+def get_property_mutability(block_id: Optional[str] = None, property_name: Optional[str] = None) -> Dict[str, Any]:
     """
-    Get all available block IDs from the agent template
+    Check if a property is mutable by attempting to get its metadata or trying a test update
     """
-    block_ids = []
+    try:
+        if block_id:
+            # For block properties
+            block = agent_template_branch.block(block_id)
+            block_data = block.data
+            
+            # Check if property exists
+            if property_name not in block_data:
+                return {
+                    'success': False,
+                    'error': f'Property {property_name} not found in block {block_id}'
+                }
+            
+            # Try to get property metadata if available
+            try:
+                # Some properties might have metadata indicating mutability
+                property_info = getattr(block, f'_{property_name}_info', None)
+                if property_info:
+                    return {
+                        'success': True,
+                        'mutable': getattr(property_info, 'mutable', True),
+                        'reason': getattr(property_info, 'reason', 'No metadata available')
+                    }
+            except:
+                pass
+            
+            # For now, assume most properties are mutable except known immutable ones
+            immutable_properties = ['id', 'type', '_id', '_type', '_version', '_created', '_updated']
+            is_mutable = property_name not in immutable_properties
+            
+            return {
+                'success': True,
+                'mutable': is_mutable,
+                'reason': 'Immutable system property' if not is_mutable else 'Editable property'
+            }
+        else:
+            # For root properties
+            agent_data = agent_template_branch.data
+            
+            if property_name not in agent_data:
+                return {
+                    'success': False,
+                    'error': f'Root property {property_name} not found'
+                }
+            
+            # Root properties are generally mutable
+            immutable_root_properties = ['_id', '_type', '_version', '_created', '_updated']
+            is_mutable = property_name not in immutable_root_properties
+            
+            return {
+                'success': True,
+                'mutable': is_mutable,
+                'reason': 'Immutable system property' if not is_mutable else 'Editable property'
+            }
+            
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+def get_block_by_path(path: str) -> Dict[str, Any]:
+    """
+    Get a specific block or data by path (e.g., 'blocks.0' or 'components.battery')
+    """
     try:
         agent_data = agent_template_branch.data
         
-        # Try to find blocks in the data structure
-        if 'blocks' in agent_data:
-            for block in agent_data['blocks']:
-                if isinstance(block, dict) and 'id' in block:
-                    block_ids.append(block['id'])
-        elif 'data' in agent_data and 'blocks' in agent_data['data']:
-            for block in agent_data['data']['blocks']:
-                if isinstance(block, dict) and 'id' in block:
-                    block_ids.append(block['id'])
+        # Navigate through the path
+        current = agent_data
+        path_parts = path.split('.')
         
-        # If no blocks found, try known IDs
-        if not block_ids:
-            known_block_ids = [
-                'PK3PCpCJRn6LpwvhWzNtsb',  # battery_cell_id
-                'PRx5qGqQD59tCW4V9tBGQb',  # battery_pack_id
-                'PRx7YwymYJgtlTDBjPKfJG',  # RCS_Z_id
-                'PRybmF9qkFSZFVf2gxYSk5',  # RCS_Y_id
-                'PRybm3zT77x3kCSSYHCKgG',  # RCS_X_id
-            ]
-            
-            for block_id in known_block_ids:
-                try:
-                    block = agent_template_branch.block(block_id)
-                    block_ids.append(block_id)
-                except:
-                    pass
+        for part in path_parts:
+            if isinstance(current, dict) and part in current:
+                current = current[part]
+            elif isinstance(current, list) and part.isdigit():
+                current = current[int(part)]
+            else:
+                return {'success': False, 'error': f'Invalid path: {path}'}
         
+        return {
+            'success': True,
+            'data': current,
+            'path': path
+        }
     except Exception as e:
-        print(f"Error getting block IDs: {e}")
-    
-    return block_ids
+        return {
+            'success': False,
+            'error': str(e)
+        }
 
 def update_block_property(block_id: str, property_name: str, new_value: Any) -> Dict[str, Any]:
     """
-    Update a specific property of a block
+    Update a specific property of a block using Sedaro client directly
     """
     try:
+        # Get the block and update it directly
         block = agent_template_branch.block(block_id)
-        update_data = {property_name: new_value}
-        block.update(**update_data)
+        block.update(**{property_name: new_value})
         
-        # Return updated block data
+        # Get the updated value from the block
+        updated_value = getattr(block, property_name, new_value)
+        
         return {
             'success': True,
-            'message': f'Successfully updated {property_name} to {new_value}',
-            'updated_data': get_block_properties(block_id)
+            'message': f'Successfully updated {property_name} to {updated_value}',
+            'updated_value': updated_value
+        }
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+def update_root_property(property_name: str, new_value: Any) -> Dict[str, Any]:
+    """
+    Update a root-level property of the agent template
+    """
+    try:
+        # Update the root property directly
+        response = agent_template_branch.update(**{property_name: new_value})
+        
+        # Get the updated value from the response
+        updated_value = getattr(response, property_name, new_value)
+        
+        return {
+            'success': True,
+            'message': f'Successfully updated root property {property_name} to {updated_value}',
+            'updated_value': updated_value
+        }
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+def start_simulation() -> Dict[str, Any]:
+    """
+    Start a simulation using Sedaro client directly
+    """
+    try:
+        # Get scenario branch and start simulation (like in the notebook)
+        scenario_branch = sedaro.scenario(SCENARIO_BRANCH_VERSION_ID)
+        sim = scenario_branch.simulation
+        
+        # Start simulation without waiting
+        simulation_handle = sim.start(wait=False)
+        
+        return {
+            'success': True,
+            'simulation_id': simulation_handle.get('id'),
+            'status': simulation_handle.get('status'),
+            'message': 'Simulation started successfully'
+        }
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+def get_simulation_results(simulation_id: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Get simulation results using Sedaro client directly
+    """
+    try:
+        scenario_branch = sedaro.scenario(SCENARIO_BRANCH_VERSION_ID)
+        sim = scenario_branch.simulation
+        
+        if simulation_id:
+            # Get specific simulation
+            simulation_handle = sim.status(job_id=simulation_id)
+        else:
+            # Get latest simulation
+            simulation_handle = sim.status()
+        
+        # Get results
+        results = simulation_handle.results()
+        stats = sim.stats()
+        
+        return {
+            'success': True,
+            'simulation_status': simulation_handle.status()['status'],
+            'end_time': results.end_time,
+            'stats': stats
         }
     except Exception as e:
         return {
@@ -330,22 +469,236 @@ def index():
                 border-radius: 4px;
                 margin: 0.5rem 0;
             }
+            .simulation-controls {
+                text-align: center;
+                margin-bottom: 2rem;
+                padding: 1rem;
+                background: #e9ecef;
+                border-radius: 5px;
+            }
+            .simulation-controls button {
+                margin: 0 0.5rem;
+            }
+            .template-explorer {
+                margin-top: 3rem;
+                padding: 2rem;
+                border: 2px solid #e9ecef;
+                border-radius: 8px;
+                background: #f8f9fa;
+            }
+            .template-explorer h2 {
+                color: #495057;
+                margin-bottom: 1rem;
+            }
+            .component-selector {
+                margin-bottom: 2rem;
+            }
+            .dropdown-container {
+                position: relative;
+                max-width: 400px;
+            }
+            .dropdown-container label {
+                display: block;
+                font-weight: bold;
+                color: #495057;
+                margin-bottom: 0.5rem;
+            }
+            .searchable-dropdown {
+                position: relative;
+            }
+            .searchable-dropdown input {
+                width: 100%;
+                padding: 0.75rem;
+                border: 2px solid #dee2e6;
+                border-radius: 4px;
+                font-size: 1rem;
+                background: white;
+            }
+            .searchable-dropdown input:focus {
+                outline: none;
+                border-color: #007bff;
+                box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+            }
+            .dropdown-list {
+                position: absolute;
+                top: 100%;
+                left: 0;
+                right: 0;
+                background: white;
+                border: 1px solid #dee2e6;
+                border-top: none;
+                border-radius: 0 0 4px 4px;
+                max-height: 200px;
+                overflow-y: auto;
+                z-index: 1000;
+                display: none;
+            }
+            .dropdown-item {
+                padding: 0.5rem 0.75rem;
+                cursor: pointer;
+                border-bottom: 1px solid #f8f9fa;
+            }
+            .dropdown-item:hover {
+                background: #f8f9fa;
+            }
+            .dropdown-item.selected {
+                background: #007bff;
+                color: white;
+            }
+            .editor-section {
+                background: white;
+                padding: 1.5rem;
+                border-radius: 5px;
+                border: 1px solid #dee2e6;
+            }
+            .editor-section h3 {
+                color: #495057;
+                margin-bottom: 1rem;
+                border-bottom: 2px solid #e9ecef;
+                padding-bottom: 0.5rem;
+            }
+            .property-item {
+                margin-bottom: 1rem;
+                padding: 1rem;
+                border: 1px solid #e9ecef;
+                border-radius: 4px;
+                background: #f8f9fa;
+            }
+            .property-name {
+                font-weight: bold;
+                color: #495057;
+                margin-bottom: 0.5rem;
+                font-size: 0.9em;
+            }
+            .property-value {
+                display: flex;
+                gap: 0.5rem;
+                align-items: center;
+            }
+            .property-value input {
+                flex: 1;
+                margin: 0;
+            }
+            .property-value button {
+                margin: 0;
+                padding: 0.25rem 0.5rem;
+                font-size: 0.8em;
+            }
+            .property-item.immutable {
+                opacity: 0.6;
+                background: #f8f9fa;
+                border: 1px solid #dee2e6;
+            }
+            .property-item.immutable .property-name {
+                color: #6c757d;
+            }
+            .property-item.immutable .property-value input {
+                background: #e9ecef;
+                color: #6c757d;
+                cursor: not-allowed;
+            }
+            .property-item.immutable .property-value button {
+                background: #6c757d;
+                cursor: not-allowed;
+            }
+            .property-item.immutable .property-value button:hover {
+                background: #6c757d;
+            }
+            .mutability-indicator {
+                font-size: 0.8em;
+                margin-left: 0.5rem;
+                padding: 0.2rem 0.4rem;
+                border-radius: 3px;
+                font-weight: normal;
+            }
+            .mutability-indicator.mutable {
+                background: #d4edda;
+                color: #155724;
+            }
+            .mutability-indicator.immutable {
+                background: #f8d7da;
+                color: #721c24;
+            }
+            .toast-notification {
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #28a745;
+                color: white;
+                padding: 1rem 1.5rem;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                z-index: 10000;
+                transform: translateX(400px);
+                transition: transform 0.3s ease-in-out;
+                max-width: 300px;
+                font-weight: 500;
+            }
+            .toast-notification.show {
+                transform: translateX(0);
+            }
+            .toast-notification.success {
+                background: #28a745;
+                border-left: 4px solid #1e7e34;
+            }
+            .toast-notification.error {
+                background: #dc3545;
+                border-left: 4px solid #c82333;
+            }
+            .toast-notification .toast-icon {
+                margin-right: 0.5rem;
+                font-size: 1.2em;
+            }
         </style>
     </head>
     <body>
+        <!-- Toast Notification -->
+        <div id="toastNotification" class="toast-notification" style="display: none;">
+            <span class="toast-icon">✅</span>
+            <span id="toastMessage">Property updated successfully!</span>
+        </div>
+
         <div class="container">
             <h1>🔧 Sedaro Agent Template Editor</h1>
-            <div style="text-align: center; margin-bottom: 2rem;">
-                <button id="simulateBtn" class="save-button" onclick="startSimulation()" style="background: #17a2b8; margin-right: 1rem;">
+            
+            <div class="simulation-controls">
+                <button id="simulateBtn" class="save-button" onclick="startSimulation()" style="background: #17a2b8;">
                     🚀 Start Simulation
+                </button>
+                <button id="resultsBtn" class="save-button" onclick="getSimulationResults()" style="background: #6f42c1;">
+                    📊 Get Results
                 </button>
                 <button id="refreshBtn" class="save-button" onclick="loadBlocks()" style="background: #6c757d;">
                     🔄 Refresh Blocks
                 </button>
             </div>
+            
             <div id="loading" class="loading">Discovering blocks and properties...</div>
             <div id="content" style="display: none;"></div>
             <div id="simulationStatus" style="display: none;"></div>
+            
+            <!-- Interactive Template Explorer -->
+            <div class="template-explorer">
+                <h2>🔍 Interactive Template Explorer</h2>
+                <p>Select a component from the dropdown and edit its properties:</p>
+                
+                <div class="component-selector">
+                    <div class="dropdown-container">
+                        <label for="componentDropdown">Select Component:</label>
+                        <div class="searchable-dropdown">
+                            <input type="text" id="searchInput" placeholder="Search components..." onkeyup="filterDropdown()">
+                            <div id="dropdownList" class="dropdown-list"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="componentEditor" style="display: none;">
+                    <div class="editor-section">
+                        <h3 id="selectedComponentName">Component Properties</h3>
+                        <div id="componentProperties"></div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Edit Modal -->
@@ -466,18 +819,6 @@ def index():
                 }
             }
 
-            // Close modal when clicking on X or outside
-            document.querySelector('.close').onclick = function() {
-                document.getElementById('editModal').style.display = 'none';
-            }
-
-            window.onclick = function(event) {
-                const modal = document.getElementById('editModal');
-                if (event.target == modal) {
-                    modal.style.display = 'none';
-                }
-            }
-
             async function startSimulation() {
                 const statusDiv = document.getElementById('simulationStatus');
                 const simulateBtn = document.getElementById('simulateBtn');
@@ -515,8 +856,428 @@ def index():
                 }
             }
 
-            // Load blocks when page loads
-            document.addEventListener('DOMContentLoaded', loadBlocks);
+            async function getSimulationResults() {
+                const statusDiv = document.getElementById('simulationStatus');
+                const resultsBtn = document.getElementById('resultsBtn');
+                
+                statusDiv.style.display = 'block';
+                statusDiv.innerHTML = '<div class="loading">Getting simulation results...</div>';
+                resultsBtn.disabled = true;
+                
+                try {
+                    const response = await fetch('/api/results', {
+                        method: 'GET'
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        statusDiv.innerHTML = `
+                            <div class="success">
+                                <h4>📊 Simulation Results</h4>
+                                <p><strong>Status:</strong> ${result.simulation_status}</p>
+                                <p><strong>End Time:</strong> ${result.end_time}</p>
+                                <pre style="background: #f8f9fa; padding: 1rem; border-radius: 4px; overflow-x: auto;">
+${JSON.stringify(result.stats, null, 2)}
+                                </pre>
+                            </div>
+                        `;
+                    } else {
+                        statusDiv.innerHTML = `<div class="error">❌ Failed to get results: ${result.error}</div>`;
+                    }
+                } catch (error) {
+                    statusDiv.innerHTML = `<div class="error">❌ Error getting results: ${error.message}</div>`;
+                } finally {
+                    resultsBtn.disabled = false;
+                }
+            }
+
+            // Close modal when clicking on X or outside
+            document.querySelector('.close').onclick = function() {
+                document.getElementById('editModal').style.display = 'none';
+            }
+
+            window.onclick = function(event) {
+                const modal = document.getElementById('editModal');
+                if (event.target == modal) {
+                    modal.style.display = 'none';
+                }
+            }
+
+            let allComponents = [];
+            let selectedComponent = null;
+
+            function showToast(message, type = 'success') {
+                const toast = document.getElementById('toastNotification');
+                const toastMessage = document.getElementById('toastMessage');
+                
+                // Set message and type
+                toastMessage.textContent = message;
+                toast.className = `toast-notification ${type}`;
+                
+                // Update icon based on type
+                const icon = toast.querySelector('.toast-icon');
+                if (type === 'success') {
+                    icon.textContent = '✅';
+                } else if (type === 'error') {
+                    icon.textContent = '❌';
+                }
+                
+                // Show toast
+                toast.style.display = 'block';
+                setTimeout(() => {
+                    toast.classList.add('show');
+                }, 10);
+                
+                // Hide toast after 3 seconds
+                setTimeout(() => {
+                    toast.classList.remove('show');
+                    setTimeout(() => {
+                        toast.style.display = 'none';
+                    }, 300);
+                }, 3000);
+            }
+
+            async function loadComponents() {
+                try {
+                    const response = await fetch('/api/template_structure');
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        console.log('Template structure:', result.data);
+                        allComponents = extractComponents(result.data);
+                        console.log('Extracted components:', allComponents);
+                        populateDropdown(allComponents);
+                    } else {
+                        alert('Error loading components: ' + result.error);
+                    }
+                } catch (error) {
+                    alert('Failed to load components: ' + error.message);
+                }
+            }
+
+            function extractComponents(data, prefix = '') {
+                let components = [];
+                
+                if (typeof data === 'object' && data !== null) {
+                    if (Array.isArray(data)) {
+                        data.forEach((item, index) => {
+                            const path = prefix ? `${prefix}.${index}` : `${index}`;
+                            if (typeof item === 'object' && item !== null) {
+                                if (item.id && item.type) {
+                                    // This looks like a block/component
+                                    components.push({
+                                        path: path,
+                                        id: item.id,
+                                        name: item.name || `${item.type}_${item.id}`,
+                                        type: item.type,
+                                        data: item
+                                    });
+                                }
+                                // Recursively extract from nested objects
+                                components = components.concat(extractComponents(item, path));
+                            }
+                        });
+                    } else {
+                        Object.keys(data).forEach(key => {
+                            const path = prefix ? `${prefix}.${key}` : key;
+                            const value = data[key];
+                            
+                            if (typeof value === 'object' && value !== null) {
+                                if (value.id && value.type) {
+                                    // This looks like a block/component
+                                    components.push({
+                                        path: path,
+                                        id: value.id,
+                                        name: value.name || `${value.type}_${value.id}`,
+                                        type: value.type,
+                                        data: value
+                                    });
+                                }
+                                // Recursively extract from nested objects
+                                components = components.concat(extractComponents(value, path));
+                            } else if (prefix === '' && (typeof value === 'number' || typeof value === 'string' || typeof value === 'boolean')) {
+                                // Root-level properties (like mass, name, etc.)
+                                components.push({
+                                    path: path,
+                                    id: path, // Use path as ID for root properties
+                                    name: key,
+                                    type: 'root_property',
+                                    data: { [key]: value }
+                                });
+                            }
+                        });
+                    }
+                }
+                
+                return components;
+            }
+
+            function populateDropdown(components) {
+                const dropdownList = document.getElementById('dropdownList');
+                dropdownList.innerHTML = '';
+                
+                components.forEach(component => {
+                    const item = document.createElement('div');
+                    item.className = 'dropdown-item';
+                    item.textContent = `${component.name} (${component.type})`;
+                    item.onclick = () => selectComponent(component);
+                    dropdownList.appendChild(item);
+                });
+            }
+
+            function filterDropdown() {
+                const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+                const dropdownList = document.getElementById('dropdownList');
+                const items = dropdownList.getElementsByClassName('dropdown-item');
+                
+                dropdownList.style.display = 'block';
+                
+                Array.from(items).forEach(item => {
+                    const text = item.textContent.toLowerCase();
+                    if (text.includes(searchTerm)) {
+                        item.style.display = 'block';
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+            }
+
+            async function selectComponent(component) {
+                selectedComponent = component;
+                document.getElementById('searchInput').value = component.name;
+                document.getElementById('dropdownList').style.display = 'none';
+                document.getElementById('componentEditor').style.display = 'block';
+                document.getElementById('selectedComponentName').textContent = `${component.name} Properties`;
+                
+                // Refresh component data from server before displaying
+                await refreshComponentData(component);
+                displayComponentProperties(selectedComponent);
+            }
+
+            async function refreshComponentData(component) {
+                try {
+                    if (component.type === 'root_property') {
+                        // For root properties, get fresh agent template data
+                        const response = await fetch('/api/template_structure');
+                        const result = await response.json();
+                        
+                        if (result.success) {
+                            const freshValue = result.data[component.name];
+                            if (freshValue !== undefined) {
+                                component.data[component.name] = freshValue;
+                            }
+                        }
+                    } else {
+                        // For block properties, get fresh block data
+                        const response = await fetch(`/api/block/${component.id}/properties`);
+                        const result = await response.json();
+                        
+                        if (result.success) {
+                            // Update the component data with fresh data
+                            Object.keys(result).forEach(key => {
+                                if (!key.startsWith('_')) {
+                                    component.data[key] = result[key];
+                                }
+                            });
+                        }
+                    }
+                } catch (error) {
+                    console.log('Failed to refresh component data:', error);
+                }
+            }
+
+            async function displayComponentProperties(component) {
+                const propertiesDiv = document.getElementById('componentProperties');
+                let html = '';
+                
+                if (component.type === 'root_property') {
+                    // For root properties, display the single property
+                    const propertyName = component.name;
+                    const value = component.data[propertyName];
+                    const mutability = await checkPropertyMutability(null, propertyName);
+                    
+                    html += `
+                        <div class="property-item ${mutability.mutable ? '' : 'immutable'}">
+                            <div class="property-name">
+                                ${propertyName}
+                                <span class="mutability-indicator ${mutability.mutable ? 'mutable' : 'immutable'}">
+                                    ${mutability.mutable ? 'Editable' : 'Read-only'}
+                                </span>
+                            </div>
+                            <div class="property-value">
+                                <input type="text" id="prop_${propertyName}" value="${JSON.stringify(value)}" 
+                                       onchange="updateComponentProperty('${propertyName}', this.value)"
+                                       ${mutability.mutable ? '' : 'disabled'}>
+                                <button onclick="saveComponentProperty('${propertyName}', this)" class="save-button"
+                                        ${mutability.mutable ? '' : 'disabled'}>Save</button>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    // For block properties, filter out internal fields and display editable properties
+                    for (const key of Object.keys(component.data)) {
+                        if (!key.startsWith('_') && key !== 'id' && key !== 'type') {
+                            const value = component.data[key];
+                            const mutability = await checkPropertyMutability(component.id, key);
+                            
+                            html += `
+                                <div class="property-item ${mutability.mutable ? '' : 'immutable'}">
+                                    <div class="property-name">
+                                        ${key}
+                                        <span class="mutability-indicator ${mutability.mutable ? 'mutable' : 'immutable'}">
+                                            ${mutability.mutable ? 'Editable' : 'Read-only'}
+                                        </span>
+                                    </div>
+                                    <div class="property-value">
+                                        <input type="text" id="prop_${key}" value="${JSON.stringify(value)}" 
+                                               onchange="updateComponentProperty('${key}', this.value)"
+                                               ${mutability.mutable ? '' : 'disabled'}>
+                                        <button onclick="saveComponentProperty('${key}', this)" class="save-button"
+                                                ${mutability.mutable ? '' : 'disabled'}>Save</button>
+                                    </div>
+                                </div>
+                            `;
+                        }
+                    }
+                }
+                
+                propertiesDiv.innerHTML = html;
+            }
+
+            async function checkPropertyMutability(blockId, propertyName) {
+                try {
+                    const url = blockId 
+                        ? `/api/mutability?block_id=${blockId}&property_name=${propertyName}`
+                        : `/api/mutability?property_name=${propertyName}`;
+                    
+                    const response = await fetch(url);
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        return result;
+                    } else {
+                        // Default to mutable if check fails
+                        return { mutable: true, reason: 'Mutability check failed' };
+                    }
+                } catch (error) {
+                    console.log('Failed to check mutability:', error);
+                    // Default to mutable if check fails
+                    return { mutable: true, reason: 'Mutability check failed' };
+                }
+            }
+
+            async function updateComponentProperty(propertyName, newValue) {
+                if (!selectedComponent) return;
+                
+                // Try to convert value to appropriate type
+                try {
+                    if (newValue.replace('.', '').replace('-', '').isdigit()) {
+                        if ('.' in newValue) {
+                            newValue = parseFloat(newValue);
+                        } else {
+                            newValue = parseInt(newValue);
+                        }
+                    } else if (newValue.toLowerCase() === 'true' || newValue.toLowerCase() === 'false') {
+                        newValue = newValue.toLowerCase() === 'true';
+                    }
+                } catch {
+                    // Keep as string if conversion fails
+                }
+                
+                // Update the component data
+                selectedComponent.data[propertyName] = newValue;
+            }
+
+            async function saveComponentProperty(propertyName, buttonElement) {
+                if (!selectedComponent) return;
+                
+                const newValue = selectedComponent.data[propertyName];
+                
+                try {
+                    let response;
+                    
+                    if (selectedComponent.type === 'root_property') {
+                        // For root-level properties, use a different endpoint
+                        response = await fetch('/api/update_root_property', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                property_name: selectedComponent.name,
+                                new_value: newValue
+                            })
+                        });
+                    } else {
+                        // For block properties, use the existing endpoint
+                        response = await fetch('/api/update_property', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                block_id: selectedComponent.id,
+                                property_name: propertyName,
+                                new_value: newValue
+                            })
+                        });
+                    }
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        // Show success message on button
+                        if (buttonElement) {
+                            const originalText = buttonElement.textContent;
+                            buttonElement.textContent = 'Saved!';
+                            buttonElement.style.background = '#28a745';
+                            setTimeout(() => {
+                                buttonElement.textContent = originalText;
+                                buttonElement.style.background = '';
+                            }, 2000);
+                        }
+                        
+                        // Show toast notification
+                        showToast(result.message, 'success');
+                        
+                        // Update the input field with the actual updated value
+                        if (result.updated_value !== undefined) {
+                            const inputField = document.getElementById(`prop_${propertyName}`);
+                            if (inputField) {
+                                inputField.value = JSON.stringify(result.updated_value);
+                            }
+                            
+                            // Update the local component data to match the server
+                            if (selectedComponent.type === 'root_property') {
+                                selectedComponent.data[selectedComponent.name] = result.updated_value;
+                            } else {
+                                selectedComponent.data[propertyName] = result.updated_value;
+                            }
+                        }
+                        
+                        console.log('Property updated successfully:', result.message);
+                    } else {
+                        showToast('Error saving property: ' + result.error, 'error');
+                    }
+                } catch (error) {
+                    showToast('Failed to save property: ' + error.message, 'error');
+                }
+            }
+
+            // Close dropdown when clicking outside
+            document.addEventListener('click', function(event) {
+                const dropdown = document.querySelector('.searchable-dropdown');
+                if (!dropdown.contains(event.target)) {
+                    document.getElementById('dropdownList').style.display = 'none';
+                }
+            });
+
+            // Load components when page loads
+            document.addEventListener('DOMContentLoaded', function() {
+                loadBlocks();
+                loadComponents();
+            });
         </script>
     </body>
     </html>
@@ -532,30 +1293,9 @@ def api_blocks():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route("/api/block/<block_id>/properties")
-def api_block_properties(block_id):
-    """API endpoint to get properties of a specific block"""
-    try:
-        properties = get_block_properties(block_id)
-        return jsonify(properties)
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route("/api/block_ids")
-def api_block_ids():
-    """API endpoint to get all available block IDs"""
-    try:
-        block_ids = get_all_block_ids()
-        return jsonify({
-            'block_ids': block_ids,
-            'count': len(block_ids)
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
 @app.route("/api/update_property", methods=['POST'])
 def api_update_property():
-    """API endpoint to update a block property"""
+    """API endpoint to update a block property using Sedaro client directly"""
     try:
         data = request.get_json()
         block_id = data.get('block_id')
@@ -563,6 +1303,35 @@ def api_update_property():
         new_value = data.get('new_value')
         
         if not all([block_id, property_name, new_value]):
+            return jsonify({'error': 'Missing required parameters'}), 400
+        
+        # Try to convert value to appropriate type
+        try:
+            if isinstance(new_value, str):
+                if new_value.replace('.', '').replace('-', '').isdigit():
+                    if '.' in new_value:
+                        new_value = float(new_value)
+                    else:
+                        new_value = int(new_value)
+                elif new_value.lower() in ['true', 'false']:
+                    new_value = new_value.lower() == 'true'
+        except:
+            pass  # Keep as string if conversion fails
+        
+        result = update_block_property(block_id, property_name, new_value)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route("/api/update_root_property", methods=['POST'])
+def api_update_root_property():
+    """API endpoint to update a root-level property of the agent template"""
+    try:
+        data = request.get_json()
+        property_name = data.get('property_name')
+        new_value = data.get('new_value')
+        
+        if not all([property_name, new_value]):
             return jsonify({'error': 'Missing required parameters'}), 400
         
         # Try to convert value to appropriate type
@@ -578,29 +1347,79 @@ def api_update_property():
         except:
             pass  # Keep as string if conversion fails
         
-        result = update_block_property(block_id, property_name, new_value)
+        result = update_root_property(property_name, new_value)
         return jsonify(result)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 @app.route("/api/simulate", methods=['POST'])
 def api_simulate():
-    """API endpoint to start a simulation"""
+    """API endpoint to start a simulation using Sedaro client directly"""
     try:
-        # Get scenario branch and start simulation
-        scenario_branch = sedaro.scenario(SCENARIO_BRANCH_VERSION_ID)
-        sim = scenario_branch.simulation
+        result = start_simulation()
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route("/api/results", methods=['GET'])
+def api_results():
+    """API endpoint to get simulation results using Sedaro client directly"""
+    try:
+        result = get_simulation_results()
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route("/api/template_structure", methods=['GET'])
+def api_template_structure():
+    """API endpoint to get the complete agent template structure"""
+    try:
+        result = get_agent_template_structure()
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route("/api/block/<block_id>/properties", methods=['GET'])
+def api_block_properties(block_id):
+    """API endpoint to get properties of a specific block"""
+    try:
+        block = agent_template_branch.block(block_id)
+        block_data = block.data
+        # Filter out internal fields and return editable properties
+        return jsonify({k: v for k, v in block_data.items() if not k.startswith('_')})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route("/api/mutability", methods=['GET'])
+def api_mutability():
+    """API endpoint to check if a property is mutable"""
+    try:
+        block_id = request.args.get('block_id')
+        property_name = request.args.get('property_name')
         
-        simulation_handle = sim.start(wait=False)
+        if not property_name:
+            return jsonify({'error': 'Missing property_name parameter'}), 400
         
-        return jsonify({
-            'success': True,
-            'simulation_id': simulation_handle.get('id'),
-            'status': simulation_handle.get('status'),
-            'message': 'Simulation started successfully'
-        })
+        result = get_property_mutability(block_id, property_name)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route("/api/explore_path", methods=['POST'])
+def api_explore_path():
+    """API endpoint to explore a specific path in the agent template data"""
+    try:
+        data = request.get_json()
+        path = data.get('path')
+        
+        if not path:
+            return jsonify({'error': 'Missing path parameter'}), 400
+        
+        result = get_block_by_path(path)
+        return jsonify(result)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0', port=5000)
+
