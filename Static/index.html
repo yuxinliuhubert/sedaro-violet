@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Dict-Driven Dropdown</title>
+  <style>
+    body { font-family: sans-serif; padding: 2rem; }
+    select { margin-top: .5rem; padding: .5rem; font-size: 1rem; }
+  </style>
+</head>
+<body>
+  <h1>Select a Field</h1>
+  <select id="fieldSelect">
+    <option>Loading…</option>
+  </select>
+
+  <script>
+    const selectEl = document.getElementById("fieldSelect");
+
+    function loadDict() {
+      fetch("/data")
+        .then(r => { if (!r.ok) throw r.statusText; return r.json(); })
+        .then(dict => {
+          // Filter out keys starting with '_'
+          const keys = Object.keys(dict).filter(k => !k.startsWith("_"));
+
+          // Rebuild the dropdown
+          selectEl.innerHTML = "";
+          const placeholder = new Option("-- select a field --", "");
+          placeholder.disabled = true;
+          placeholder.selected = true;
+          selectEl.add(placeholder);
+
+          keys.forEach(key => {
+            selectEl.add(new Option(key, key));
+          });
+        })
+        .catch(err => {
+          console.error("Failed to load /data:", err);
+          selectEl.innerHTML = "<option>Error loading fields</option>";
+        });
+    }
+
+    document.addEventListener("DOMContentLoaded", loadDict);
+  </script>
+</body>
+</html>
