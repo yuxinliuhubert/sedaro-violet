@@ -835,9 +835,6 @@ def index():
                 <button id="simulateBtn" class="save-button" onclick="startSimulation()" style="background: #17a2b8;">
                     🚀 Start Simulation
                 </button>
-                <button id="statusBtn" class="save-button" onclick="checkSimulationStatus()" style="background: #ffc107; color: #212529;">
-                    📈 Check Status
-                </button>
                 <button id="resultsBtn" class="save-button" onclick="getSimulationResults()" style="background: #6f42c1;">
                     📊 Get Results
                 </button>
