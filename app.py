@@ -14,7 +14,36 @@ sedaro = SedaroApiClient(api_key = API_KEY)
 # agent template is only for satellite model (agent), and don't copy the model repo ID, only the branch ID (version)
 agent_template_branch = sedaro.agent_template(TEMP_AGENT_REPO_BRANCH_ID) # we are going to change this templated agent
 
-app = Flask(__name__, static_folder='static', static_url_path='')
+def refresh_agent_template(template_id: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Refresh the agent template connection with a new template ID
+    """
+    global agent_template_branch
+    
+    try:
+        # Use provided ID or fall back to the constant
+        template_id = template_id or TEMP_AGENT_REPO_BRANCH_ID
+        
+        # Create new agent template connection
+        agent_template_branch = sedaro.agent_template(template_id)
+        
+        # Test the connection by trying to access data
+        test_data = agent_template_branch.data
+        print(f"Successfully connected to agent template: {template_id}")
+        
+        return {
+            'success': True,
+            'message': f'Successfully switched to agent template: {template_id}',
+            'template_id': template_id,
+            'data_keys': list(test_data.keys()) if isinstance(test_data, dict) else []
+        }
+    except Exception as e:
+        return {
+            'success': False,
+            'error': f'Failed to connect to agent template {template_id}: {str(e)}'
+        }
+
+app = Flask(__name__, static_folder='Static', static_url_path='')
 
 def discover_blocks() -> Dict[str, List[Dict[str, Any]]]:
     """
@@ -287,6 +316,88 @@ def start_simulation() -> Dict[str, Any]:
             'error': str(e)
         }
 
+def get_simulation_status(simulation_id: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Get simulation status and progress without blocking
+    """
+    try:
+        scenario_branch = sedaro.scenario(SCENARIO_BRANCH_VERSION_ID)
+        sim = scenario_branch.simulation
+        
+        if simulation_id:
+            # Get specific simulation status
+            simulation_handle = sim.status(job_id=simulation_id)
+        else:
+            # Get latest simulation status
+            simulation_handle = sim.status()
+        
+        status_data = simulation_handle.status()
+        status = status_data.get('status', 'UNKNOWN')
+        
+        # Extract detailed progress information
+        progress_info = {}
+        if status == 'RUNNING':
+            # Get detailed progress data
+            progress_data = status_data.get('progress', {})
+            if isinstance(progress_data, dict):
+                progress_info = {
+                    'percentComplete': progress_data.get('percentComplete', 0),
+                    'currentTime': progress_data.get('currentTime', 0),
+                    'startTime': progress_data.get('startTime', 0),
+                    'stopTime': progress_data.get('stopTime', 0),
+                    'minTimeStep': progress_data.get('minTimeStep', 0),
+                    'argMinTimeStep': progress_data.get('argMinTimeStep', [])
+                }
+            else:
+                progress_info = {'percentComplete': progress_data}
+        else:
+            progress_info = {'percentComplete': 0}
+        
+        progress = progress_info.get('percentComplete', 0)
+        
+        # Create detailed message
+        if status == 'RUNNING' and progress_info:
+            message = f"Simulation RUNNING ({progress}% complete)"
+        else:
+            message = f"Simulation {status} ({progress}% complete)"
+        
+        return {
+            'success': True,
+            'simulation_id': simulation_handle.get('id'),
+            'status': status,
+            'progress': progress,
+            'progress_info': progress_info,
+            'is_complete': status in ['SUCCEEDED', 'FAILED', 'TERMINATED'],
+            'message': message
+        }
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+def abort_simulation(simulation_id: str) -> Dict[str, Any]:
+    """
+    Abort a running simulation
+    """
+    try:
+        scenario_branch = sedaro.scenario(SCENARIO_BRANCH_VERSION_ID)
+        sim = scenario_branch.simulation
+        
+        # Abort the simulation
+        simulation_handle = sim.status(job_id=simulation_id)
+        simulation_handle.terminate()
+        
+        return {
+            'success': True,
+            'message': f'Simulation {simulation_id} aborted successfully'
+        }
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
 def get_simulation_results(simulation_id: Optional[str] = None) -> Dict[str, Any]:
     """
     Get simulation results using Sedaro client directly
@@ -390,7 +501,7 @@ def index():
                 word-break: break-all;
             }
             .edit-button {
-                background: #007bff;
+                background: #c3adff;
                 color: white;
                 border: none;
                 padding: 0.25rem 0.5rem;
@@ -400,7 +511,7 @@ def index():
                 margin-left: 0.5rem;
             }
             .edit-button:hover {
-                background: #0056b3;
+                background: #a78bfa;
             }
             .modal {
                 display: none;
@@ -439,7 +550,7 @@ def index():
                 box-sizing: border-box;
             }
             .save-button {
-                background: #28a745;
+                background: #c3adff;
                 color: white;
                 border: none;
                 padding: 0.5rem 1rem;
@@ -448,7 +559,7 @@ def index():
                 margin-top: 1rem;
             }
             .save-button:hover {
-                background: #218838;
+                background: #a78bfa;
             }
             .loading {
                 text-align: center;
@@ -619,6 +730,62 @@ def index():
                 background: #f8d7da;
                 color: #721c24;
             }
+            .simulation-progress {
+                margin: 2rem 0;
+                padding: 1.5rem;
+                background: #f8f9fa;
+                border-radius: 8px;
+                border: 1px solid #dee2e6;
+            }
+            .simulation-progress h3 {
+                margin-bottom: 1rem;
+                color: #495057;
+            }
+            .progress-container {
+                display: flex;
+                align-items: center;
+                gap: 1rem;
+                margin-bottom: 1rem;
+            }
+            .progress-bar {
+                flex: 1;
+                height: 20px;
+                background: #e9ecef;
+                border-radius: 10px;
+                overflow: hidden;
+            }
+            .progress-fill {
+                height: 100%;
+                background: linear-gradient(90deg, #c3adff, #a78bfa);
+                width: 0%;
+                transition: width 0.3s ease;
+            }
+            .progress-text {
+                font-weight: bold;
+                color: #495057;
+                min-width: 50px;
+            }
+            .status-text {
+                color: #6c757d;
+                font-style: italic;
+            }
+            
+            .progress-details {
+                margin-top: 15px;
+                padding: 10px;
+                background: #f8f9fa;
+                border-radius: 5px;
+                border-left: 3px solid #c3adff;
+            }
+            
+            .detail-item {
+                margin: 5px 0;
+                font-size: 14px;
+            }
+            
+            .detail-item strong {
+                color: #495057;
+            }
             .toast-notification {
                 position: fixed;
                 top: 20px;
@@ -659,11 +826,17 @@ def index():
         </div>
 
         <div class="container">
-            <h1>🔧 Sedaro Agent Template Editor</h1>
+            <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 2rem; gap: 15px;">
+                <img src="/violetlabsinc_logo.jpeg" alt="Violet Labs Logo" style="height: 60px; max-width: 200px; object-fit: contain;">
+                <h1 style="margin: 0; color: #c3adff; font-size: 2.5rem; font-weight: bold;">Violet Sedaro Platform</h1>
+            </div>
             
             <div class="simulation-controls">
                 <button id="simulateBtn" class="save-button" onclick="startSimulation()" style="background: #17a2b8;">
                     🚀 Start Simulation
+                </button>
+                <button id="statusBtn" class="save-button" onclick="checkSimulationStatus()" style="background: #ffc107; color: #212529;">
+                    📈 Check Status
                 </button>
                 <button id="resultsBtn" class="save-button" onclick="getSimulationResults()" style="background: #6f42c1;">
                     📊 Get Results
@@ -671,6 +844,35 @@ def index():
                 <button id="refreshBtn" class="save-button" onclick="loadBlocks()" style="background: #6c757d;">
                     🔄 Refresh Blocks
                 </button>
+                <button id="refreshTemplateBtn" class="save-button" onclick="refreshTemplate()" style="background: #fd7e14;">
+                    🔄 Refresh Template
+                </button>
+            </div>
+            
+            <!-- Simulation Progress -->
+            <div id="simulationProgress" style="display: none;" class="simulation-progress">
+                <h3>🔄 Simulation Progress</h3>
+                <div class="progress-container">
+                    <div class="progress-bar">
+                        <div id="progressFill" class="progress-fill"></div>
+                    </div>
+                    <div id="progressText" class="progress-text">0%</div>
+                    <button id="abortBtn" class="save-button" onclick="abortSimulation()" style="background: #dc3545;">
+                        🛑 Abort
+                    </button>
+                </div>
+                <div id="statusText" class="status-text">Starting simulation...</div>
+                <div id="progressDetails" class="progress-details" style="display: none;">
+                    <div class="detail-item">
+                        <strong>Current Time:</strong> <span id="currentTime">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <strong>Time Range:</strong> <span id="timeRange">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <strong>Min Time Step:</strong> <span id="minTimeStep">-</span>
+                    </div>
+                </div>
             </div>
             
             <div id="loading" class="loading">Discovering blocks and properties...</div>
@@ -722,6 +924,8 @@ def index():
         <script>
             let currentBlockId = null;
             let currentPropertyName = null;
+            let currentSimulationId = null;
+            let progressInterval = null;
 
             async function loadBlocks() {
                 try {
@@ -822,6 +1026,7 @@ def index():
             async function startSimulation() {
                 const statusDiv = document.getElementById('simulationStatus');
                 const simulateBtn = document.getElementById('simulateBtn');
+                const progressDiv = document.getElementById('simulationProgress');
                 
                 statusDiv.style.display = 'block';
                 statusDiv.innerHTML = '<div class="loading">Starting simulation...</div>';
@@ -838,6 +1043,8 @@ def index():
                     const result = await response.json();
                     
                     if (result.success) {
+                        currentSimulationId = result.simulation_id;
+                        
                         statusDiv.innerHTML = `
                             <div class="success">
                                 <h4>✅ Simulation Started Successfully!</h4>
@@ -846,6 +1053,17 @@ def index():
                                 <p><strong>Message:</strong> ${result.message}</p>
                             </div>
                         `;
+                        
+                        // Show progress bar and start monitoring
+                        progressDiv.style.display = 'block';
+                        
+                        // Make sure progress bar and abort button are visible
+                        const progressBar = document.querySelector('.progress-container');
+                        const abortBtn = document.getElementById('abortBtn');
+                        if (progressBar) progressBar.style.display = 'flex';
+                        if (abortBtn) abortBtn.style.display = 'block';
+                        
+                        startProgressMonitoring(result.simulation_id);
                     } else {
                         statusDiv.innerHTML = `<div class="error">❌ Failed to start simulation: ${result.error}</div>`;
                     }
@@ -853,6 +1071,161 @@ def index():
                     statusDiv.innerHTML = `<div class="error">❌ Error starting simulation: ${error.message}</div>`;
                 } finally {
                     simulateBtn.disabled = false;
+                }
+            }
+
+            async function checkSimulationStatus() {
+                if (!currentSimulationId) {
+                    alert('No simulation running. Start a simulation first.');
+                    return;
+                }
+                
+                await updateProgress(currentSimulationId);
+            }
+
+            function startProgressMonitoring(simulationId) {
+                // Clear any existing interval
+                if (progressInterval) {
+                    clearInterval(progressInterval);
+                }
+                
+                // Update immediately
+                updateProgress(simulationId);
+                
+                // Then update every 2 seconds
+                progressInterval = setInterval(async () => {
+                    const isComplete = await updateProgress(simulationId);
+                    if (isComplete) {
+                        clearInterval(progressInterval);
+                        progressInterval = null;
+                    }
+                }, 2000);
+            }
+
+            async function updateProgress(simulationId) {
+                try {
+                    const response = await fetch(`/api/simulation_status?simulation_id=${simulationId}`);
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        const progressFill = document.getElementById('progressFill');
+                        const progressText = document.getElementById('progressText');
+                        const statusText = document.getElementById('statusText');
+                        const progressDetails = document.getElementById('progressDetails');
+                        
+                        // Update progress bar
+                        const progress = result.progress || 0;
+                        progressFill.style.width = `${progress}%`;
+                        progressText.textContent = `${Math.round(progress)}%`;
+                        
+                        // Update status text
+                        statusText.textContent = result.message;
+                        
+                        // Update detailed progress information if available
+                        if (result.progress_info && result.status === 'RUNNING') {
+                            const currentTime = document.getElementById('currentTime');
+                            const timeRange = document.getElementById('timeRange');
+                            const minTimeStep = document.getElementById('minTimeStep');
+                            
+                            if (result.progress_info.currentTime !== undefined) {
+                                currentTime.textContent = result.progress_info.currentTime.toFixed(1);
+                            }
+                            
+                            if (result.progress_info.startTime !== undefined && result.progress_info.stopTime !== undefined) {
+                                timeRange.textContent = `${result.progress_info.startTime.toFixed(1)} - ${result.progress_info.stopTime.toFixed(1)}`;
+                            }
+                            
+                            if (result.progress_info.minTimeStep !== undefined) {
+                                minTimeStep.textContent = result.progress_info.minTimeStep.toExponential(1);
+                            }
+                            
+                            progressDetails.style.display = 'block';
+                        } else {
+                            progressDetails.style.display = 'none';
+                        }
+                        
+                        // Check if simulation is complete
+                        if (result.is_complete) {
+                            if (result.status === 'SUCCEEDED') {
+                                statusText.textContent = '✅ Simulation completed successfully!';
+                                showToast('Simulation completed successfully!', 'success');
+                            } else {
+                                statusText.textContent = `❌ Simulation ${result.status.toLowerCase()}`;
+                                showToast(`Simulation ${result.status.toLowerCase()}`, 'error');
+                            }
+                            
+                            // Hide progress bar and abort button, but keep status message
+                            const progressBar = document.querySelector('.progress-container');
+                            const abortBtn = document.getElementById('abortBtn');
+                            if (progressBar) progressBar.style.display = 'none';
+                            if (abortBtn) abortBtn.style.display = 'none';
+                            
+                            // Reset simulation ID to allow new simulations
+                            currentSimulationId = null;
+                            
+                            return true; // Stop polling
+                        }
+                        
+                        return false; // Continue polling
+                    } else {
+                        console.error('Failed to get simulation status:', result.error);
+                        return false;
+                    }
+                } catch (error) {
+                    console.error('Error checking simulation status:', error);
+                    return false;
+                }
+            }
+
+            async function abortSimulation() {
+                if (!currentSimulationId) {
+                    showToast('No simulation running to abort', 'error');
+                    return;
+                }
+                
+                if (!confirm('Are you sure you want to abort the current simulation?')) {
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('/api/abort_simulation', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            simulation_id: currentSimulationId
+                        })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        showToast('Simulation aborted successfully', 'success');
+                        
+                        // Stop progress monitoring
+                        if (progressInterval) {
+                            clearInterval(progressInterval);
+                            progressInterval = null;
+                        }
+                        
+                        // Update UI
+                        const statusText = document.getElementById('statusText');
+                        const progressDetails = document.getElementById('progressDetails');
+                        const progressBar = document.querySelector('.progress-container');
+                        const abortBtn = document.getElementById('abortBtn');
+                        
+                        statusText.textContent = 'Simulation aborted';
+                        progressDetails.style.display = 'none';
+                        if (progressBar) progressBar.style.display = 'none';
+                        if (abortBtn) abortBtn.style.display = 'none';
+                        
+                        currentSimulationId = null;
+                    } else {
+                        showToast(`Failed to abort simulation: ${result.error}`, 'error');
+                    }
+                } catch (error) {
+                    showToast(`Error aborting simulation: ${error.message}`, 'error');
                 }
             }
 
@@ -1278,6 +1651,38 @@ ${JSON.stringify(result.stats, null, 2)}
                 loadBlocks();
                 loadComponents();
             });
+
+            async function refreshTemplate() {
+                const refreshBtn = document.getElementById('refreshTemplateBtn');
+                refreshBtn.disabled = true;
+                refreshBtn.textContent = '🔄 Refreshing...';
+                
+                try {
+                    const response = await fetch('/api/refresh_template', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        showToast(`Template refreshed successfully! Template ID: ${result.template_id}`, 'success');
+                        
+                        // Reload components and blocks
+                        await loadComponents();
+                        await loadBlocks();
+                    } else {
+                        showToast(`Failed to refresh template: ${result.error}`, 'error');
+                    }
+                } catch (error) {
+                    showToast(`Error refreshing template: ${error.message}`, 'error');
+                } finally {
+                    refreshBtn.disabled = false;
+                    refreshBtn.textContent = '🔄 Refresh Template';
+                }
+            }
         </script>
     </body>
     </html>
@@ -1361,6 +1766,31 @@ def api_simulate():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route("/api/simulation_status", methods=['GET'])
+def api_simulation_status():
+    """API endpoint to get simulation status and progress"""
+    try:
+        simulation_id = request.args.get('simulation_id')
+        result = get_simulation_status(simulation_id)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route("/api/abort_simulation", methods=['POST'])
+def api_abort_simulation():
+    """API endpoint to abort a simulation"""
+    try:
+        data = request.get_json()
+        simulation_id = data.get('simulation_id')
+        
+        if not simulation_id:
+            return jsonify({'error': 'Missing simulation_id parameter'}), 400
+        
+        result = abort_simulation(simulation_id)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route("/api/results", methods=['GET'])
 def api_results():
     """API endpoint to get simulation results using Sedaro client directly"""
@@ -1416,6 +1846,18 @@ def api_explore_path():
             return jsonify({'error': 'Missing path parameter'}), 400
         
         result = get_block_by_path(path)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route("/api/refresh_template", methods=['POST'])
+def api_refresh_template():
+    """API endpoint to refresh the agent template connection"""
+    try:
+        data = request.get_json()
+        template_id = data.get('template_id') if data else None
+        
+        result = refresh_agent_template(template_id)
         return jsonify(result)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
