@@ -513,6 +513,109 @@ def index():
             .edit-button:hover {
                 background: #a78bfa;
             }
+            
+            /* Tracked Properties Styling */
+            .tracked-properties-section {
+                margin-top: 2rem;
+                padding: 1.5rem;
+                border: 1px solid #dee2e6;
+                border-radius: 6px;
+                background: #f8f9fa;
+            }
+            .tracked-properties-section h3 {
+                color: #495057;
+                margin-bottom: 1rem;
+                font-size: 1.2em;
+            }
+            .tracked-property-block {
+                margin: 1rem 0;
+                padding: 1.5rem;
+                border: 2px solid #c3adff;
+                border-radius: 8px;
+                background: white;
+                box-shadow: 0 2px 8px rgba(195, 173, 255, 0.1);
+            }
+            .tracked-property-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 1rem;
+                padding-bottom: 0.5rem;
+                border-bottom: 1px solid #e9ecef;
+            }
+            .tracked-property-name {
+                font-weight: bold;
+                color: #495057;
+                font-size: 1.1em;
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+            }
+            .auto-trigger-badge {
+                background: #28a745;
+                color: white;
+                padding: 0.2rem 0.5rem;
+                border-radius: 12px;
+                font-size: 0.7em;
+                font-weight: normal;
+            }
+            .tracked-property-actions {
+                display: flex;
+                gap: 0.5rem;
+            }
+            .tracked-property-actions button {
+                padding: 0.25rem 0.5rem;
+                border: none;
+                border-radius: 3px;
+                cursor: pointer;
+                font-size: 0.8em;
+            }
+            .tracked-property-actions .edit-btn {
+                background: #c3adff;
+                color: white;
+            }
+            .tracked-property-actions .edit-btn:hover {
+                background: #a78bfa;
+            }
+            .tracked-property-actions .delete-btn {
+                background: #dc3545;
+                color: white;
+            }
+            .tracked-property-actions .delete-btn:hover {
+                background: #c82333;
+            }
+            .tracked-property-details {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 1rem;
+                margin-top: 1rem;
+            }
+            .tracked-property-item {
+                padding: 0.75rem;
+                border: 1px solid #dee2e6;
+                border-radius: 4px;
+                background: #f8f9fa;
+            }
+            .tracked-property-label {
+                font-weight: bold;
+                color: #495057;
+                font-size: 0.9em;
+                margin-bottom: 0.25rem;
+            }
+            .tracked-property-value {
+                color: #6c757d;
+                font-family: monospace;
+                word-break: break-all;
+            }
+            .empty-state {
+                text-align: center;
+                padding: 2rem;
+                color: #6c757d;
+                font-style: italic;
+            }
+            .empty-state p {
+                margin: 0.5rem 0;
+            }
             .modal {
                 display: none;
                 position: fixed;
@@ -851,6 +954,47 @@ def index():
                 display: none;
             }
             
+            /* Small toggle for spreadsheet rows */
+            .toggle-container-small {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            
+            .toggle-container-small input[type="checkbox"] {
+                display: none;
+            }
+            
+            .toggle-slider-small {
+                position: relative;
+                width: 32px;
+                height: 16px;
+                background: #ccc;
+                border-radius: 8px;
+                transition: background 0.3s;
+                cursor: pointer;
+            }
+            
+            .toggle-slider-small:before {
+                content: '';
+                position: absolute;
+                width: 12px;
+                height: 12px;
+                border-radius: 50%;
+                top: 2px;
+                left: 2px;
+                background: white;
+                transition: transform 0.3s;
+            }
+            
+            .toggle-container-small input[type="checkbox"]:checked + .toggle-slider-small {
+                background: #c3adff;
+            }
+            
+            .toggle-container-small input[type="checkbox"]:checked + .toggle-slider-small:before {
+                transform: translateX(16px);
+            }
+            
             .spreadsheet-container {
                 background: white;
                 border-radius: 8px;
@@ -1060,7 +1204,7 @@ def index():
                     </div>
                     <div id="progressText" class="progress-text">0%</div>
                     <button id="abortBtn" class="save-button" onclick="abortSimulation()" style="background: #dc3545;">
-                        🛑 Abort
+                        Abort
                     </button>
                 </div>
                 <div id="statusText" class="status-text">Starting simulation...</div>
@@ -1087,11 +1231,6 @@ def index():
                 <p>Define input variables and associate them with template properties for automatic simulation triggering:</p>
                 
                 <div class="spreadsheet-controls">
-                    <label class="toggle-container">
-                        <input type="checkbox" id="autoSimToggle">
-                        <span class="toggle-slider"></span>
-                        Auto-trigger simulation on changes
-                    </label>
                     <button id="addRowBtn" class="save-button" onclick="addSpreadsheetRow()" style="background: #c3adff;">
                         ➕ Add Row
                     </button>
@@ -1107,6 +1246,7 @@ def index():
                                 <th>Variable Name</th>
                                 <th>Input Value</th>
                                 <th>Associated Template Property</th>
+                                <th>Auto-Trigger</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -1119,7 +1259,7 @@ def index():
             
             <!-- Interactive Template Explorer -->
             <div class="template-explorer">
-                <h2>Interactive Template Explorer</h2>
+                <h2>🔍 Interactive Template Explorer</h2>
                 <p>Select a component from the dropdown and edit its properties:</p>
                 
                 <div class="component-selector">
@@ -1138,6 +1278,24 @@ def index():
                         <div id="componentProperties"></div>
                     </div>
                 </div>
+                
+                <!-- Tracked Properties Display -->
+                <div class="tracked-properties-section">
+                    <h3>📊 Tracked Properties</h3>
+                    <p>Properties currently being tracked and managed through the spreadsheet interface:</p>
+                    
+                    <div id="trackedPropertiesContainer">
+                        <!-- Tracked properties will be displayed here -->
+                    </div>
+                    
+                    <div id="noTrackedProperties" style="display: none;">
+                        <div class="empty-state">
+                            <p>No properties are currently being tracked.</p>
+                            <p>Add variables in the spreadsheet above to start tracking properties.</p>
+                        </div>
+                    </div>
+                </div>
+                            </div>
             </div>
         </div>
 
@@ -1274,6 +1432,8 @@ def index():
             }
 
             async function loadBlocks() {
+                // Commented out battery block display for now
+                /*
                 try {
                     const response = await fetch('/api/blocks');
                     const blocks = await response.json();
@@ -1294,6 +1454,13 @@ def index():
                         `<div class="error">Failed to load blocks: ${error.message}</div>`;
                     document.getElementById('loading').style.display = 'none';
                 }
+                */
+                
+                // Hide the loading and content divs since we're not using battery blocks
+                const loadingDiv = document.getElementById('loading');
+                const contentDiv = document.getElementById('content');
+                if (loadingDiv) loadingDiv.style.display = 'none';
+                if (contentDiv) contentDiv.style.display = 'none';
             }
 
             function generateBlocksHTML(blocks) {
@@ -2026,8 +2193,19 @@ ${JSON.stringify(result.stats, null, 2)}
                 setTimeout(() => {
                     initializeSpreadsheet();
                     
-                    // Setup state persistence after everything is initialized
-                    setupStatePersistence();
+                                    // Setup state persistence after everything is initialized
+                setupStatePersistence();
+                
+                // Update tracked properties display
+                updateTrackedPropertiesDisplay();
+                
+                // Add event listener for auto-trigger toggle
+                const autoSimToggle = document.getElementById('autoSimToggle');
+                if (autoSimToggle) {
+                    autoSimToggle.addEventListener('change', function() {
+                        updateTrackedPropertiesDisplay();
+                    });
+                }
                 }, 500);
             });
 
@@ -2105,6 +2283,13 @@ ${JSON.stringify(result.stats, null, 2)}
                                    onclick="showPropertyDropdown('${rowId}')">
                             <div class="property-dropdown" id="dropdown-${rowId}"></div>
                         </div>
+                    </td>
+                    <td>
+                        <label class="toggle-container-small">
+                            <input type="checkbox" id="autoTrigger-${rowId}" 
+                                   onchange="updateSpreadsheetData('${rowId}', 'autoTrigger', this.checked)">
+                            <span class="toggle-slider-small"></span>
+                        </label>
                     </td>
                     <td>
                         <div class="action-buttons">
@@ -2532,6 +2717,9 @@ ${JSON.stringify(result.stats, null, 2)}
                 // Hide the dropdown
                 dropdown.style.display = 'none';
                 
+                // Update tracked properties display
+                updateTrackedPropertiesDisplay();
+                
                 // Show success message
                 showToast(`Associated with ${property.displayName}`, 'success');
                 
@@ -2547,23 +2735,151 @@ ${JSON.stringify(result.stats, null, 2)}
                 }
                 spreadsheetData[rowId][field] = value;
                 
-                // Check if auto-sim is enabled and we have both name and associated property
-                if (document.getElementById('autoSimToggle').checked && 
+                // Update tracked properties display
+                updateTrackedPropertiesDisplay();
+                
+                // Check if this specific row has auto-trigger enabled and we have both name and associated property
+                if (spreadsheetData[rowId].autoTrigger && 
                     spreadsheetData[rowId].name && 
                     spreadsheetData[rowId].associatedProperty) {
                     applySpreadsheetChanges();
                 }
             }
+            
+            function updateTrackedPropertiesDisplay() {
+                const container = document.getElementById('trackedPropertiesContainer');
+                const noTrackedDiv = document.getElementById('noTrackedProperties');
+                
+                if (!container) return;
+                
+                // Get tracked properties (rows with associated properties) - prevent duplicates
+                const trackedProperties = [];
+                const seenProperties = new Set(); // Track unique property associations
+                
+                for (const [rowId, data] of Object.entries(spreadsheetData)) {
+                    if (data.name && data.associatedProperty) {
+                        // Create a unique key for this property association
+                        const propertyKey = `${data.associatedProperty.blockId || 'root'}-${data.associatedProperty.name}`;
+                        
+                        // Only add if we haven't seen this property before
+                        if (!seenProperties.has(propertyKey)) {
+                            seenProperties.add(propertyKey);
+                            trackedProperties.push({
+                                rowId: rowId,
+                                ...data
+                            });
+                        }
+                    }
+                }
+                
+                if (trackedProperties.length === 0) {
+                    container.innerHTML = '';
+                    if (noTrackedDiv) noTrackedDiv.style.display = 'block';
+                    return;
+                }
+                
+                if (noTrackedDiv) noTrackedDiv.style.display = 'none';
+                
+                let html = '';
+                trackedProperties.forEach(prop => {
+                    // Check if this property has auto-trigger enabled (per-row setting)
+                    const hasAutoTrigger = prop.autoTrigger && prop.value && prop.value.trim() !== '';
+                    
+                    html += `
+                        <div class="tracked-property-block">
+                            <div class="tracked-property-header">
+                                <div class="tracked-property-name">
+                                    ${prop.name}
+                                    ${hasAutoTrigger ? '<span class="auto-trigger-badge">🔄 Auto</span>' : ''}
+                                </div>
+                                <div class="tracked-property-actions">
+                                    <button class="edit-btn" onclick="editTrackedProperty('${prop.rowId}')">
+                                        ✏️ Edit
+                                    </button>
+                                    <button class="delete-btn" onclick="deleteTrackedProperty('${prop.rowId}')">
+                                        🗑️ Stop Tracking
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="tracked-property-details">
+                                <div class="tracked-property-item">
+                                    <div class="tracked-property-label">Variable Name</div>
+                                    <div class="tracked-property-value">${prop.name}</div>
+                                </div>
+                                <div class="tracked-property-item">
+                                    <div class="tracked-property-label">Current Value</div>
+                                    <div class="tracked-property-value">${prop.value || 'Not set'}</div>
+                                </div>
+                                <div class="tracked-property-item">
+                                    <div class="tracked-property-label">Template Property</div>
+                                    <div class="tracked-property-value">${prop.associatedProperty.displayName}</div>
+                                </div>
+                                <div class="tracked-property-item">
+                                    <div class="tracked-property-label">Last Applied Value</div>
+                                    <div class="tracked-property-value">${prop.lastAppliedValue !== null ? prop.lastAppliedValue : 'Not applied'}</div>
+                                </div>
+                                <div class="tracked-property-item">
+                                    <div class="tracked-property-label">Auto-Trigger Status</div>
+                                    <div class="tracked-property-value">
+                                        ${hasAutoTrigger ? 
+                                            '<span style="color: #28a745; font-weight: bold;">🔄 Active</span>' : 
+                                            '<span style="color: #6c757d;">⏸️ Inactive</span>'
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                container.innerHTML = html;
+            }
+            
+            function editTrackedProperty(rowId) {
+                // Find the row in the spreadsheet and focus on it
+                const row = document.getElementById(`row-${rowId}`);
+                if (row) {
+                    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    // Highlight the row briefly
+                    row.style.backgroundColor = '#fff3cd';
+                    setTimeout(() => {
+                        row.style.backgroundColor = '';
+                    }, 2000);
+                }
+            }
+            
+            function deleteTrackedProperty(rowId) {
+                if (confirm('Are you sure you want to stop tracking this property? This will remove the association but keep the row.')) {
+                    // Clear the associated property but keep the row
+                    if (spreadsheetData[rowId]) {
+                        spreadsheetData[rowId].associatedProperty = null;
+                        spreadsheetData[rowId].lastAppliedValue = null;
+                        
+                        // Clear the property input in the spreadsheet
+                        const row = document.getElementById(`row-${rowId}`);
+                        if (row) {
+                            const propertyInput = row.querySelector('td:nth-child(3) input');
+                            if (propertyInput) {
+                                propertyInput.value = '';
+                            }
+                        }
+                        
+                        // Update the display
+                        updateTrackedPropertiesDisplay();
+                        saveState();
+                        
+                        showToast('Property tracking stopped', 'info');
+                    }
+                }
+            }
 
             async function applySpreadsheetChanges() {
-                const autoSimEnabled = document.getElementById('autoSimToggle').checked;
-                if (!autoSimEnabled) return;
-                
                 let hasChanges = false;
                 let hasErrors = false;
                 
                 for (const [rowId, data] of Object.entries(spreadsheetData)) {
-                    if (data.name && data.value && data.associatedProperty) {
+                    // Only process rows that have auto-trigger enabled
+                    if (data.autoTrigger && data.name && data.value && data.associatedProperty) {
                         const currentValue = parseValue(data.value);
                         const lastValue = data.lastAppliedValue;
                         
