@@ -11,6 +11,8 @@
 \usepackage{enumitem}
 \usepackage{amsmath}
 \usepackage{amssymb}
+\usepackage{longtable}
+\usepackage{booktabs}
 
 % Page setup
 \geometry{margin=1in}
@@ -42,7 +44,7 @@
 \begin{document}
 
 \title{\Huge\textbf{Sedaro Violet Platform}\\\large Technical Implementation Documentation}
-\author{Development Team}
+\author{Violet Labs Development Team}
 \date{\today}
 \maketitle
 
@@ -51,43 +53,65 @@
 
 \section{Executive Summary}
 
-The Sedaro Violet Platform is a Flask-based web application that provides an intuitive interface for managing and simulating agent templates using the Sedaro Python client. The platform features a spreadsheet-like interface for parameter management, real-time simulation monitoring, and comprehensive state persistence.
+The Sedaro Violet Platform is a comprehensive Flask-based web application that provides an intuitive interface for managing and simulating Sedaro agent templates. The platform features a sophisticated spreadsheet-like interface for parameter management, real-time simulation monitoring, interactive template exploration, and robust state persistence. Built with modern web technologies, it serves as a bridge between complex simulation parameters and user-friendly interface design.
 
 \section{Architecture Overview}
 
 \subsection{Technology Stack}
 \begin{itemize}
-    \item \textbf{Backend}: Flask (Python web framework)
-    \item \textbf{Frontend}: HTML5, CSS3, JavaScript (Vanilla)
+    \item \textbf{Backend}: Flask 2.x (Python web framework)
+    \item \textbf{Frontend}: HTML5, CSS3, Vanilla JavaScript (ES6+)
     \item \textbf{API Client}: Sedaro Python SDK
-    \item \textbf{State Management}: Browser localStorage
-    \item \textbf{Styling}: Custom CSS with Violet Labs branding
+    \item \textbf{State Management}: Browser localStorage with automatic persistence
+    \item \textbf{Styling}: Custom CSS with Violet Labs branding (\#c3adff primary)
+    \item \textbf{Deployment}: Standalone Flask server (port 5000)
 \end{itemize}
 
 \subsection{Core Components}
 \begin{enumerate}
-    \item Agent Template Management
-    \item Interactive Property Editor
-    \item BOM Spreadsheet Interface
-    \item Simulation Control System
-    \item State Persistence Layer
+    \item \textbf{Agent Template Management System} - Direct Sedaro API integration
+    \item \textbf{Interactive Template Explorer} - Visual property editing interface
+    \item \textbf{BOM Spreadsheet Interface} - Parameter management with auto-trigger
+    \item \textbf{Simulation Control System} - Real-time monitoring and control
+    \item \textbf{State Persistence Layer} - Automatic data recovery
+    \item \textbf{Property Tracking System} - Visual management of tracked properties
 \end{enumerate}
 
-\section{Key Features Implementation}
+\section{Configuration and Setup}
 
-\subsection{1. Agent Template Integration}
+\subsection{Environment Configuration}
+The platform requires the following configuration constants:
 
-\textbf{Purpose}: Direct integration with Sedaro agent templates for real-time property management.
+\begin{lstlisting}[language=Python, caption=Platform Configuration]
+API_KEY = "PKDqMrtcTK4plJgL7qVlQD.0xQph1lyKzd-pV0-ZL7bRIH7BX54Yjqbz6tluwut3Hvp8XE-RVbfHSz2o5vC77scUhg2xBFuBybplxY6FyXXMQ"
+TEMP_AGENT_REPO_BRANCH_ID = "PS5ZPCp6mh5yXLH3lkCWFj"  # Template repository
+SCENARIO_BRANCH_VERSION_ID = "PRx5rSwrGfkK4n9vFXmVbt"  # Simulation scenario
+WORKSPACE_ID = "PQtnGZNNPdzZM5JdVhP5P9"  # Violet/Ethereal workspace
+\end{lstlisting}
 
-\textbf{Code Location}: Lines 17-25, 138-154
-
-\begin{lstlisting}[language=Python, caption=Agent Template Initialization]
+\subsection{Initialization Process}
+\begin{lstlisting}[language=Python, caption=Platform Initialization]
 # Define modules
-sedaro = SedaroApiClient(api_key = API_KEY)
+sedaro = SedaroApiClient(api_key=API_KEY)
 agent_template_branch = sedaro.agent_template(TEMP_AGENT_REPO_BRANCH_ID)
+\end{lstlisting}
 
+\section{Core Features Implementation}
+
+\subsection{1. Agent Template Management System}
+
+\textbf{Purpose}: Direct integration with Sedaro agent templates for real-time property management and structure exploration.
+
+\textbf{Key Functions}:
+\begin{itemize}
+    \item \texttt{refresh\_agent\_template()} - Dynamic template switching
+    \item \texttt{get\_agent\_template\_structure()} - Complete data structure access
+    \item \texttt{discover\_blocks()} - Automatic block discovery and categorization
+\end{itemize}
+
+\begin{lstlisting}[language=Python, caption=Template Structure Management]
 def get_agent_template_structure() -> Dict[str, Any]:
-    """Get the complete structure of the agent template data"""
+    """Get the complete structure of the agent template data for dropdown exploration"""
     try:
         agent_data = agent_template_branch.data
         return {
@@ -100,28 +124,133 @@ def get_agent_template_structure() -> Dict[str, Any]:
             'success': False,
             'error': str(e)
         }
+
+def discover_blocks() -> Dict[str, List[Dict[str, Any]]]:
+    """Discover all blocks in the agent template and categorize them by type"""
+    blocks_by_type = {}
+    
+    try:
+        agent_data = agent_template_branch.data
+        all_blocks = []
+        
+        # Multiple data structure support
+        if 'blocks' in agent_data:
+            all_blocks = agent_data['blocks']
+        elif 'data' in agent_data and 'blocks' in agent_data['data']:
+            all_blocks = agent_data['data']['blocks']
+        else:
+            # Fallback to known block IDs
+            known_block_ids = [
+                'PK3PCpCJRn6LpwvhWzNtsb',  # battery_cell_id
+                'PRx5qGqQD59tCW4V9tBGQb',  # battery_pack_id
+                'PRx7YwymYJgtlTDBjPKfJG',  # RCS_Z_id
+                'PRybmF9qkFSZFVf2gxYSk5',  # RCS_Y_id
+                'PRybm3zT77x3kCSSYHCKgG',  # RCS_X_id
+            ]
+            
+            for block_id in known_block_ids:
+                try:
+                    block = agent_template_branch.block(block_id)
+                    block_data = block.data
+                    block_type = block_data.get('type', 'Unknown')
+                    
+                    if block_type not in blocks_by_type:
+                        blocks_by_type[block_type] = []
+                    
+                    filtered_data = {k: v for k, v in block_data.items() 
+                                   if not k.startswith('_')}
+                    
+                    blocks_by_type[block_type].append({
+                        'id': block_id,
+                        'name': block_data.get('name', f'{block_type}_{block_id}'),
+                        'data': filtered_data,
+                        'type': block_type
+                    })
+                except Exception as e:
+                    print(f"Could not access block {block_id}: {e}")
+    
+    except Exception as e:
+        print(f"Error discovering blocks: {e}")
+        blocks_by_type = {}
+    
+    return blocks_by_type
 \end{lstlisting}
 
-\textbf{Key Features}:
+\textbf{Features}:
 \begin{itemize}
-    \item Direct Sedaro client integration
-    \item Template structure exploration
-    \item Dynamic property discovery
-    \item Real-time template refresh capability
+    \item Dynamic template connection management
+    \item Automatic block discovery and categorization
+    \item Fallback to known block IDs for reliability
+    \item Comprehensive error handling and logging
+    \item Support for multiple data structure formats
 \end{itemize}
 
-\subsection{2. Interactive Property Editor}
+\subsection{2. Interactive Template Explorer}
 
-\textbf{Purpose}: Visual interface for editing block and root-level properties with mutability detection.
+\textbf{Purpose}: Visual interface for exploring and editing template properties with real-time mutability detection.
 
-\textbf{Code Location}: Lines 155-219, 250-292
+\textbf{Key Functions}:
+\begin{itemize}
+    \item \texttt{get\_property\_mutability()} - Property editability detection
+    \item \texttt{update\_block\_property()} - Direct block property updates
+    \item \texttt{update\_root\_property()} - Root-level property management
+\end{itemize}
 
-\begin{lstlisting}[language=Python, caption=Property Update Functions]
+\begin{lstlisting}[language=Python, caption=Property Management System]
+def get_property_mutability(block_id: Optional[str] = None, property_name: Optional[str] = None) -> Dict[str, Any]:
+    """Check if a property is mutable by attempting to get its metadata or trying a test update"""
+    try:
+        if block_id:
+            # For block properties
+            block = agent_template_branch.block(block_id)
+            block_data = block.data
+            
+            if property_name not in block_data:
+                return {
+                    'success': False,
+                    'error': f'Property {property_name} not found in block {block_id}'
+                }
+            
+            # Check for immutable system properties
+            immutable_properties = ['id', 'type', '_id', '_type', '_version', '_created', '_updated']
+            is_mutable = property_name not in immutable_properties
+            
+            return {
+                'success': True,
+                'mutable': is_mutable,
+                'reason': 'Immutable system property' if not is_mutable else 'Editable property'
+            }
+        else:
+            # For root properties
+            agent_data = agent_template_branch.data
+            
+            if property_name not in agent_data:
+                return {
+                    'success': False,
+                    'error': f'Root property {property_name} not found'
+                }
+            
+            immutable_root_properties = ['_id', '_type', '_version', '_created', '_updated']
+            is_mutable = property_name not in immutable_root_properties
+            
+            return {
+                'success': True,
+                'mutable': is_mutable,
+                'reason': 'Immutable system property' if not is_mutable else 'Editable property'
+            }
+            
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
 def update_block_property(block_id: str, property_name: str, new_value: Any) -> Dict[str, Any]:
     """Update a specific property of a block using Sedaro client directly"""
     try:
         block = agent_template_branch.block(block_id)
         block.update(**{property_name: new_value})
+        
         updated_value = getattr(block, property_name, new_value)
         
         return {
@@ -134,48 +263,29 @@ def update_block_property(block_id: str, property_name: str, new_value: Any) -> 
             'success': False,
             'error': str(e)
         }
-
-def get_property_mutability(block_id: Optional[str] = None, property_name: Optional[str] = None) -> Dict[str, Any]:
-    """Check if a property is mutable by attempting to get its metadata"""
-    try:
-        if block_id:
-            block = agent_template_branch.block(block_id)
-            block_data = block.data
-            
-            if property_name not in block_data:
-                return {
-                    'success': False,
-                    'error': f'Property {property_name} not found in block {block_id}'
-                }
-            
-            immutable_properties = ['id', 'type', '_id', '_type', '_version', '_created', '_updated']
-            is_mutable = property_name not in immutable_properties
-            
-            return {
-                'success': True,
-                'mutable': is_mutable,
-                'reason': 'Immutable system property' if not is_mutable else 'Editable property'
-            }
-    except Exception as e:
-        return {
-            'success': False,
-            'error': str(e)
-        }
 \end{lstlisting}
 
-\textbf{Key Features}:
+\textbf{Features}:
 \begin{itemize}
-    \item Direct Sedaro client property updates
-    \item Mutability detection for UI feedback
-    \item Type conversion handling
-    \item Comprehensive error handling
+    \item Real-time mutability detection for UI feedback
+    \item Automatic type conversion (string to number/boolean)
+    \item Comprehensive error handling with user-friendly messages
+    \item Support for both block and root-level properties
+    \item Direct Sedaro client integration for immediate updates
 \end{itemize}
 
 \subsection{3. BOM Spreadsheet Interface}
 
-\textbf{Purpose}: Spreadsheet-like interface for managing input variables and associating them with template properties.
+\textbf{Purpose}: Advanced spreadsheet-like interface for managing input variables and associating them with template properties, featuring auto-trigger simulation capabilities.
 
-\textbf{Code Location}: Lines 2074-2150, 2400-2500
+\textbf{Key Components}:
+\begin{itemize}
+    \item Dynamic row management with unique IDs
+    \item Property association via hierarchical dropdown
+    \item Auto-trigger simulation system
+    \item Real-time value validation and type conversion
+    \item State persistence and restoration
+\end{itemize}
 
 \begin{lstlisting}[language=JavaScript, caption=Spreadsheet Row Management]
 function addSpreadsheetRow(restoreRowId = null, restoreData = null) {
@@ -201,6 +311,13 @@ function addSpreadsheetRow(restoreRowId = null, restoreData = null) {
             </div>
         </td>
         <td>
+            <label class="toggle-container-small">
+                <input type="checkbox" id="autoTrigger-${rowId}" 
+                       onchange="updateSpreadsheetData('${rowId}', 'autoTrigger', this.checked)">
+                <span class="toggle-slider-small"></span>
+            </label>
+        </td>
+        <td>
             <div class="action-buttons">
                 <button class="action-btn save" onclick="saveProperty('${rowId}')">
                     💾 Save
@@ -214,6 +331,7 @@ function addSpreadsheetRow(restoreRowId = null, restoreData = null) {
     
     tbody.appendChild(row);
     
+    // Initialize data structure
     if (restoreData) {
         spreadsheetData[rowId] = restoreData;
         // Restore input values
@@ -231,36 +349,111 @@ function addSpreadsheetRow(restoreRowId = null, restoreData = null) {
             name: '',
             value: '',
             associatedProperty: null,
+            autoTrigger: false,
             lastAppliedValue: null
         };
     }
 }
 \end{lstlisting}
 
-\textbf{Key Features}:
+\textbf{Property Association System}:
+\begin{lstlisting}[language=JavaScript, caption=Property Dropdown System]
+function showPropertyDropdown(rowId) {
+    const dropdown = document.getElementById(`dropdown-${rowId}`);
+    
+    // Clear previous content
+    dropdown.innerHTML = '';
+    
+    // Add search functionality
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.placeholder = 'Search properties...';
+    searchInput.className = 'spreadsheet-input';
+    searchInput.style = 'margin-bottom: 8px;';
+    searchInput.onkeyup = function() {
+        filterPropertyDropdown(dropdown, this.value);
+    };
+    dropdown.appendChild(searchInput);
+    
+    // Group properties by type
+    const rootProperties = allTemplateProperties.filter(p => !p.isBlock && !p.blockId);
+    const blockProperties = allTemplateProperties.filter(p => p.isBlock);
+    const drilledProperties = allTemplateProperties.filter(p => !p.isBlock && p.blockId);
+    
+    // Add root properties
+    if (rootProperties.length > 0) {
+        const rootHeader = document.createElement('div');
+        rootHeader.className = 'property-item';
+        rootHeader.style = 'background: #f8f9fa; font-weight: bold; color: #495057;';
+        rootHeader.innerHTML = '<div>🌐 Root Properties</div>';
+        dropdown.appendChild(rootHeader);
+        
+        rootProperties.forEach(prop => {
+            const item = document.createElement('div');
+            item.className = 'property-item';
+            item.style = 'padding-left: 20px;';
+            item.innerHTML = `
+                <div>${prop.displayName}</div>
+                <div class="property-path">${prop.path}</div>
+            `;
+            item.onclick = function(e) {
+                e.stopPropagation();
+                selectProperty(rowId, prop);
+            };
+            dropdown.appendChild(item);
+        });
+    }
+    
+    // Add drilled-down block properties
+    if (drilledProperties.length > 0) {
+        const blockHeader = document.createElement('div');
+        blockHeader.className = 'property-item';
+        blockHeader.style = 'background: #f8f9fa; font-weight: bold; color: #495057;';
+        blockHeader.innerHTML = '<div>🔧 Block Properties</div>';
+        dropdown.appendChild(blockHeader);
+        
+        drilledProperties.forEach(prop => {
+            const item = document.createElement('div');
+            item.className = 'property-item';
+            item.style = 'padding-left: 20px;';
+            item.innerHTML = `
+                <div>${prop.displayName}</div>
+                <div class="property-path">${prop.path}</div>
+            `;
+            item.onclick = function(e) {
+                e.stopPropagation();
+                selectProperty(rowId, prop);
+            };
+            dropdown.appendChild(item);
+        });
+    }
+    
+    dropdown.style.display = 'block';
+}
+\end{lstlisting}
+
+\textbf{Features}:
 \begin{itemize}
-    \item Dynamic row addition/deletion
-    \item Property association via dropdown
-    \item Auto-trigger simulation capability
-    \item State restoration support
+    \item Hierarchical property organization (Root, Block, Drilled)
+    \item Real-time search and filtering
+    \item Expandable block components
+    \item Auto-trigger toggle per row
+    \item Visual feedback for property associations
+    \item Comprehensive error handling
 \end{itemize}
 
 \subsection{4. Auto-Trigger Simulation System}
 
-\textbf{Purpose}: Automatically trigger simulations when variables change, with comprehensive error handling.
+\textbf{Purpose}: Intelligent simulation triggering system that automatically starts simulations when tracked properties change, with comprehensive error handling and validation.
 
-\textbf{Code Location}: Lines 2400-2500
-
-\begin{lstlisting}[language=JavaScript, caption=Auto-Trigger Logic]
+\begin{lstlisting}[language=JavaScript, caption=Auto-Trigger Implementation]
 async function applySpreadsheetChanges() {
-    const autoSimEnabled = document.getElementById('autoSimToggle').checked;
-    if (!autoSimEnabled) return;
-    
     let hasChanges = false;
     let hasErrors = false;
     
     for (const [rowId, data] of Object.entries(spreadsheetData)) {
-        if (data.name && data.value && data.associatedProperty) {
+        // Only process rows that have auto-trigger enabled
+        if (data.autoTrigger && data.name && data.value && data.associatedProperty) {
             const currentValue = parseValue(data.value);
             const lastValue = data.lastAppliedValue;
             
@@ -269,8 +462,19 @@ async function applySpreadsheetChanges() {
                 try {
                     let updateResponse;
                     
-                    if (data.associatedProperty.blockId) {
+                    if (data.associatedProperty.isBlock) {
                         // Update block property
+                        updateResponse = await fetch('/api/update_property', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                block_id: data.associatedProperty.id,
+                                property_name: data.associatedProperty.name,
+                                new_value: currentValue
+                            })
+                        });
+                    } else if (data.associatedProperty.blockId) {
+                        // Update block property (drilled down)
                         updateResponse = await fetch('/api/update_property', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -295,6 +499,7 @@ async function applySpreadsheetChanges() {
                     const updateResult = await updateResponse.json();
                     
                     if (updateResult.success) {
+                        // Check if the property actually changed on the server
                         const actualChanged = updateResult.updated_value !== data.lastAppliedValue;
                         
                         if (actualChanged) {
@@ -304,6 +509,7 @@ async function applySpreadsheetChanges() {
                             showToast(`No change needed for ${data.name}`, 'info');
                         }
                         
+                        // Update last applied value with the actual server value
                         spreadsheetData[rowId].lastAppliedValue = updateResult.updated_value;
                     } else {
                         hasErrors = true;
@@ -321,28 +527,28 @@ async function applySpreadsheetChanges() {
     if (hasChanges && !hasErrors) {
         setTimeout(() => {
             startSimulation();
-        }, 1000);
+        }, 1000); // Small delay to ensure all updates are processed
     } else if (hasErrors) {
         showToast('Simulation skipped due to update errors', 'error');
     }
 }
 \end{lstlisting}
 
-\textbf{Key Features}:
+\textbf{Features}:
 \begin{itemize}
+    \item Per-row auto-trigger configuration
     \item Change detection and validation
     \item Comprehensive error handling
     \item Conditional simulation triggering
     \item User feedback through toast notifications
+    \item Server-side value verification
 \end{itemize}
 
 \subsection{5. Real-Time Simulation Monitoring}
 
-\textbf{Purpose}: Non-blocking simulation progress monitoring with automatic polling and timeout protection.
+\textbf{Purpose}: Non-blocking simulation progress monitoring with automatic polling, timeout protection, and detailed progress reporting.
 
-\textbf{Code Location}: Lines 1325-1400
-
-\begin{lstlisting}[language=JavaScript, caption=Progress Monitoring System]
+\begin{lstlisting}[language=JavaScript, caption=Simulation Monitoring System]
 function startProgressMonitoring(simulationId) {
     // Clear any existing interval
     if (progressInterval) {
@@ -386,6 +592,7 @@ async function updateProgress(simulationId) {
             const progressFill = document.getElementById('progressFill');
             const progressText = document.getElementById('progressText');
             const statusText = document.getElementById('statusText');
+            const progressDetails = document.getElementById('progressDetails');
             
             // Update progress bar
             const progress = result.progress || 0;
@@ -394,6 +601,29 @@ async function updateProgress(simulationId) {
             
             // Update status text
             statusText.textContent = result.message;
+            
+            // Update detailed progress information if available
+            if (result.progress_info && result.status === 'RUNNING') {
+                const currentTime = document.getElementById('currentTime');
+                const timeRange = document.getElementById('timeRange');
+                const minTimeStep = document.getElementById('minTimeStep');
+                
+                if (result.progress_info.currentTime !== undefined) {
+                    currentTime.textContent = result.progress_info.currentTime.toFixed(1);
+                }
+                
+                if (result.progress_info.startTime !== undefined && result.progress_info.stopTime !== undefined) {
+                    timeRange.textContent = `${result.progress_info.startTime.toFixed(1)} - ${result.progress_info.stopTime.toFixed(1)}`;
+                }
+                
+                if (result.progress_info.minTimeStep !== undefined) {
+                    minTimeStep.textContent = result.progress_info.minTimeStep.toExponential(1);
+                }
+                
+                progressDetails.style.display = 'block';
+            } else {
+                progressDetails.style.display = 'none';
+            }
             
             // Check if simulation is complete
             if (result.is_complete) {
@@ -431,20 +661,19 @@ async function updateProgress(simulationId) {
 }
 \end{lstlisting}
 
-\textbf{Key Features}:
+\textbf{Features}:
 \begin{itemize}
-    \item Non-blocking progress updates
-    \item Automatic polling with 2-second intervals
-    \item 30-minute safety timeout
+    \item Non-blocking progress updates every 2 seconds
+    \item 30-minute safety timeout to prevent infinite polling
+    \item Detailed progress information display
+    \item Automatic UI state management
     \item Comprehensive error handling
-    \item UI state management
+    \item Simulation completion detection
 \end{itemize}
 
 \subsection{6. State Persistence System}
 
-\textbf{Purpose}: Prevent data loss on page refresh by saving and restoring application state.
-
-\textbf{Code Location}: Lines 1170-1250
+\textbf{Purpose}: Robust state persistence system that prevents data loss on page refresh and provides seamless user experience recovery.
 
 \begin{lstlisting}[language=JavaScript, caption=State Persistence Implementation]
 function saveState() {
@@ -533,103 +762,411 @@ function setupStatePersistence() {
 }
 \end{lstlisting}
 
-\textbf{Key Features}:
+\textbf{Features}:
 \begin{itemize}
     \item Automatic state saving every 5 seconds
     \item State restoration on page load
-    \item Simulation state recovery
-    \item Spreadsheet data persistence
-    \item Error handling for corrupted state
+    \item Simulation state recovery and monitoring restoration
+    \item Spreadsheet data persistence with UI restoration
+    \item Error handling for corrupted state data
+    \item Page unload state preservation
+\end{itemize}
+
+\subsection{7. Property Tracking System}
+
+\textbf{Purpose}: Visual management system for tracked properties with real-time status display and management capabilities.
+
+\begin{lstlisting}[language=JavaScript, caption=Property Tracking Display]
+function updateTrackedPropertiesDisplay() {
+    const container = document.getElementById('trackedPropertiesContainer');
+    const noTrackedDiv = document.getElementById('noTrackedProperties');
+    
+    if (!container) return;
+    
+    // Get tracked properties (rows with associated properties) - prevent duplicates
+    const trackedProperties = [];
+    const seenProperties = new Set(); // Track unique property associations
+    
+    for (const [rowId, data] of Object.entries(spreadsheetData)) {
+        if (data.name && data.associatedProperty) {
+            // Create a unique key for this property association using name and block ID
+            const propertyKey = `${data.associatedProperty.blockId || 'root'}-${data.associatedProperty.name}`;
+            
+            // Only add if we haven't seen this property before
+            if (!seenProperties.has(propertyKey)) {
+                seenProperties.add(propertyKey);
+                trackedProperties.push({
+                    rowId: rowId,
+                    ...data
+                });
+            }
+        }
+    }
+    
+    if (trackedProperties.length === 0) {
+        container.innerHTML = '';
+        if (noTrackedDiv) noTrackedDiv.style.display = 'block';
+        return;
+    }
+    
+    if (noTrackedDiv) noTrackedDiv.style.display = 'none';
+    
+    let html = '';
+    trackedProperties.forEach(prop => {
+        // Check if this property has auto-trigger enabled (per-row setting)
+        const hasAutoTrigger = prop.autoTrigger && prop.value && prop.value.trim() !== '';
+        
+        html += `
+            <div class="tracked-property-block">
+                <div class="tracked-property-header">
+                    <div class="tracked-property-name">
+                        ${prop.name}
+                        ${hasAutoTrigger ? '<span class="auto-trigger-badge">🔄 Auto</span>' : ''}
+                    </div>
+                    <div class="tracked-property-actions">
+                        <button class="edit-btn" onclick="editTrackedProperty('${prop.rowId}')">
+                            ✏️ Edit
+                        </button>
+                        <button class="delete-btn" onclick="deleteTrackedProperty('${prop.rowId}')">
+                            🗑️ Stop Tracking
+                        </button>
+                    </div>
+                </div>
+                <div class="tracked-property-details">
+                    <div class="tracked-property-item">
+                        <div class="tracked-property-label">Variable Name</div>
+                        <div class="tracked-property-value">${prop.name}</div>
+                    </div>
+                    <div class="tracked-property-item">
+                        <div class="tracked-property-label">Current Value</div>
+                        <div class="tracked-property-value">${prop.value || 'Not set'}</div>
+                    </div>
+                    <div class="tracked-property-item">
+                        <div class="tracked-property-label">Template Property</div>
+                        <div class="tracked-property-value">${prop.associatedProperty.displayName}</div>
+                    </div>
+                    <div class="tracked-property-item">
+                        <div class="tracked-property-label">Last Applied Value</div>
+                        <div class="tracked-property-value">${prop.lastAppliedValue !== null ? prop.lastAppliedValue : 'Not applied'}</div>
+                    </div>
+                    <div class="tracked-property-item">
+                        <div class="tracked-property-label">Auto-Trigger Status</div>
+                        <div class="tracked-property-value">
+                            ${hasAutoTrigger ? 
+                                '<span style="color: #28a745; font-weight: bold;">🔄 Active</span>' : 
+                                '<span style="color: #6c757d;">⏸️ Inactive</span>'
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+\end{lstlisting}
+
+\textbf{Features}:
+\begin{itemize}
+    \item Visual property tracking dashboard
+    \item Real-time status updates
+    \item Auto-trigger status indicators
+    \item Quick edit and stop tracking actions
+    \item Duplicate property prevention
+    \item Comprehensive property information display
 \end{itemize}
 
 \section{API Endpoints}
 
-\subsection{Core Endpoints}
+\subsection{Core Management Endpoints}
 
-\begin{enumerate}
-    \item \texttt{/api/blocks} - Get all blocks and properties
-    \item \texttt{/api/update\_property} - Update block properties
-    \item \texttt{/api/update\_root\_property} - Update root-level properties
-    \item \texttt{/api/simulate} - Start simulation
-    \item \texttt{/api/simulation\_status} - Get simulation progress
-    \item \texttt{/api/abort\_simulation} - Abort running simulation
-    \item \texttt{/api/template\_structure} - Get template structure
-    \item \texttt{/api/refresh\_template} - Refresh template connection
-\end{enumerate}
+\begin{longtable}{|p{3cm}|p{2cm}|p{8cm}|}
+\hline
+\textbf{Endpoint} & \textbf{Method} & \textbf{Description} \\
+\hline
+\endhead
+\hline
+\endfoot
+\texttt{/api/blocks} & GET & Discover and categorize all blocks in the agent template \\
+\texttt{/api/template\_structure} & GET & Get complete agent template data structure \\
+\texttt{/api/refresh\_template} & POST & Refresh agent template connection with optional new template ID \\
+\texttt{/api/block/<id>/properties} & GET & Get properties of a specific block \\
+\texttt{/api/mutability} & GET & Check if a property is mutable (block or root level) \\
+\texttt{/api/explore\_path} & POST & Explore specific path in template data structure \\
+\hline
+\end{longtable}
+
+\subsection{Property Management Endpoints}
+
+\begin{longtable}{|p{3cm}|p{2cm}|p{8cm}|}
+\hline
+\textbf{Endpoint} & \textbf{Method} & \textbf{Description} \\
+\hline
+\endhead
+\hline
+\endfoot
+\texttt{/api/update\_property} & POST & Update a specific block property \\
+\texttt{/api/update\_root\_property} & POST & Update a root-level template property \\
+\hline
+\end{longtable}
+
+\subsection{Simulation Control Endpoints}
+
+\begin{longtable}{|p{3cm}|p{2cm}|p{8cm}|}
+\hline
+\textbf{Endpoint} & \textbf{Method} & \textbf{Description} \\
+\hline
+\endhead
+\hline
+\endfoot
+\texttt{/api/simulate} & POST & Start a new simulation \\
+\texttt{/api/simulation\_status} & GET & Get simulation progress and status \\
+\texttt{/api/abort\_simulation} & POST & Abort a running simulation \\
+\texttt{/api/results} & GET & Get simulation results and statistics \\
+\hline
+\end{longtable}
 
 \section{User Interface Features}
 
-\subsection{Visual Design}
+\subsection{Visual Design System}
+
+\textbf{Color Scheme}:
 \begin{itemize}
-    \item \textbf{Branding}: Violet Labs color scheme (\#c3adff primary)
-    \item \textbf{Responsive Layout}: Mobile-friendly design
-    \item \textbf{Toast Notifications}: Real-time user feedback
-    \item \textbf{Progress Indicators}: Visual simulation progress
-    \item \textbf{Interactive Elements}: Hover effects and transitions
+    \item \textbf{Primary}: \#c3adff (Violet Labs purple)
+    \item \textbf{Secondary}: \#a78bfa (Darker purple)
+    \item \textbf{Success}: \#28a745 (Green)
+    \item \textbf{Error}: \#dc3545 (Red)
+    \item \textbf{Info}: \#17a2b8 (Blue)
+    \item \textbf{Warning}: \#ffc107 (Yellow)
 \end{itemize}
 
-\subsection{User Experience}
+\textbf{Component Styling}:
 \begin{itemize}
-    \item \textbf{Intuitive Workflow}: Step-by-step parameter management
-    \item \textbf{Error Prevention}: Validation and confirmation dialogs
-    \item \textbf{State Recovery}: Seamless refresh experience
-    \item \textbf{Real-time Updates}: Live progress monitoring
+    \item \textbf{Responsive Layout}: Mobile-friendly design with CSS Grid and Flexbox
+    \item \textbf{Toast Notifications}: Real-time user feedback with smooth animations
+    \item \textbf{Progress Indicators}: Visual simulation progress with detailed metrics
+    \item \textbf{Interactive Elements}: Hover effects, transitions, and visual feedback
+    \item \textbf{Modal Dialogs}: Property editing with validation
+\end{itemize}
+
+\subsection{User Experience Features}
+
+\begin{itemize}
+    \item \textbf{Intuitive Workflow}: Step-by-step parameter management with visual guidance
+    \item \textbf{Error Prevention}: Comprehensive validation and confirmation dialogs
+    \item \textbf{State Recovery}: Seamless refresh experience with automatic state restoration
+    \item \textbf{Real-time Updates}: Live progress monitoring and property synchronization
+    \item \textbf{Keyboard Navigation}: Full keyboard support for accessibility
+    \item \textbf{Search and Filter}: Advanced property discovery and filtering
 \end{itemize}
 
 \section{Error Handling Strategy}
 
 \subsection{Comprehensive Error Management}
-\begin{enumerate}
-    \item \textbf{API Error Handling}: Graceful degradation for network issues
-    \item \textbf{Validation Errors}: User-friendly error messages
-    \item \textbf{State Corruption}: Automatic recovery mechanisms
-    \item \textbf{Simulation Failures}: Detailed error reporting
-\end{enumerate}
+
+\textbf{API Error Handling}:
+\begin{itemize}
+    \item Graceful degradation for network issues
+    \item Automatic retry mechanisms for transient failures
+    \item User-friendly error messages with actionable guidance
+    \item Detailed error logging for debugging
+\end{itemize}
+
+\textbf{Validation Errors}:
+\begin{itemize}
+    \item Real-time input validation with immediate feedback
+    \item Type conversion error handling
+    \item Property existence verification
+    \item Mutability checking before update attempts
+\end{itemize}
+
+\textbf{State Corruption Recovery}:
+\begin{itemize}
+    \item Automatic detection of corrupted localStorage data
+    \item Graceful fallback to default state
+    \item User notification of state recovery actions
+    \item Prevention of cascading failures
+\end{itemize}
+
+\textbf{Simulation Failures}:
+\begin{itemize}
+    \item Detailed error reporting with context
+    \item Automatic cleanup of failed simulation states
+    \item User guidance for common failure scenarios
+    \item Recovery mechanisms for interrupted simulations
+\end{itemize}
 
 \section{Performance Optimizations}
 
 \subsection{Efficiency Measures}
+
+\textbf{Loading Optimizations}:
 \begin{itemize}
-    \item \textbf{Lazy Loading}: Template properties loaded on demand
-    \item \textbf{Debounced Updates}: Reduced API calls during rapid changes
-    \item \textbf{Memory Management}: Proper cleanup of intervals and event listeners
-    \item \textbf{Caching}: Local storage for state persistence
+    \item Lazy loading of template properties on demand
+    \item Progressive enhancement of UI components
+    \item Efficient DOM manipulation with minimal reflows
+    \item Optimized property discovery algorithms
+\end{itemize}
+
+\textbf{Update Optimizations}:
+\begin{itemize}
+    \item Debounced updates to reduce API calls during rapid changes
+    \item Batch processing of multiple property updates
+    \item Change detection to prevent unnecessary server requests
+    \item Efficient state synchronization
+\end{itemize}
+
+\textbf{Memory Management}:
+\begin{itemize}
+    \item Proper cleanup of intervals and event listeners
+    \item Efficient data structures for large property sets
+    \item Automatic garbage collection of unused references
+    \item Memory leak prevention in long-running sessions
+\end{itemize}
+
+\textbf{Caching Strategy}:
+\begin{itemize}
+    \item Local storage for state persistence
+    \item Template structure caching
+    \item Property metadata caching
+    \item Simulation status caching with TTL
 \end{itemize}
 
 \section{Development Best Practices}
 
-\subsection{Code Quality}
+\subsection{Code Quality Standards}
+
+\textbf{Modular Design}:
 \begin{itemize}
-    \item \textbf{Modular Design}: Separated concerns and reusable components
-    \item \textbf{Error Boundaries}: Comprehensive try-catch blocks
-    \item \textbf{Documentation}: Inline comments and function documentation
-    \item \textbf{Type Safety}: Proper data type handling
+    \item Separated concerns with clear function boundaries
+    \item Reusable components and utility functions
+    \item Consistent naming conventions
+    \item Comprehensive function documentation
+\end{itemize}
+
+\textbf{Error Boundaries}:
+\begin{itemize}
+    \item Comprehensive try-catch blocks at all levels
+    \item Graceful error recovery mechanisms
+    \item User-friendly error messages
+    \item Detailed error logging for debugging
+\end{itemize}
+
+\textbf{Type Safety}:
+\begin{itemize}
+    \item Proper data type handling and conversion
+    \item Input validation and sanitization
+    \item Type checking for critical operations
+    \item Defensive programming practices
+\end{itemize}
+
+\textbf{Documentation}:
+\begin{itemize}
+    \item Inline comments for complex logic
+    \item Function documentation with parameter descriptions
+    \item API endpoint documentation
+    \item User interface documentation
+\end{itemize}
+
+\section{Security Considerations}
+
+\subsection{Data Protection}
+
+\begin{itemize}
+    \item \textbf{API Key Security}: Secure storage and transmission of Sedaro API keys
+    \item \textbf{Input Validation}: Comprehensive validation of all user inputs
+    \item \textbf{XSS Prevention}: Proper escaping of user-generated content
+    \item \textbf{CSRF Protection}: Protection against cross-site request forgery
+\end{itemize}
+
+\subsection{Access Control}
+
+\begin{itemize}
+    \item \textbf{Template Access}: Validation of template access permissions
+    \item \textbf{Property Modification}: Verification of property modification rights
+    \item \textbf{Simulation Control}: Authorization checks for simulation operations
 \end{itemize}
 
 \section{Future Enhancements}
 
 \subsection{Planned Features}
-\begin{enumerate}
-    \item \textbf{Batch Operations}: Multi-property updates
-    \item \textbf{Template Versioning}: Historical data tracking
-    \item \textbf{Advanced Analytics}: Simulation result analysis
-    \item \textbf{User Authentication}: Multi-user support
-    \item \textbf{API Rate Limiting}: Enhanced performance monitoring
-\end{enumerate}
+
+\textbf{Advanced Analytics}:
+\begin{itemize}
+    \item Simulation result analysis and visualization
+    \item Performance trend tracking
+    \item Comparative analysis tools
+    \item Export capabilities for reports
+\end{itemize}
+
+\textbf{Enhanced Collaboration}:
+\begin{itemize}
+    \item Multi-user support with role-based access
+    \item Real-time collaboration features
+    \item Template sharing and versioning
+    \item Comment and annotation systems
+\end{itemize}
+
+\textbf{Advanced Automation}:
+\begin{itemize}
+    \item Scheduled simulation execution
+    \item Conditional simulation triggering
+    \item Batch processing capabilities
+    \item Integration with external systems
+\end{itemize}
+
+\textbf{Performance Monitoring}:
+\begin{itemize}
+    \item API rate limiting and monitoring
+    \item Performance metrics collection
+    \item Resource usage optimization
+    \item Scalability improvements
+\end{itemize}
+
+\section{Deployment and Operations}
+
+\subsection{Deployment Configuration}
+
+\textbf{Environment Setup}:
+\begin{itemize}
+    \item Flask development server (port 5000)
+    \item Static file serving for assets
+    \item Environment variable configuration
+    \item API key management
+\end{itemize}
+
+\textbf{Production Considerations}:
+\begin{itemize}
+    \item WSGI server deployment (Gunicorn/uWSGI)
+    \item Reverse proxy configuration (Nginx)
+    \item SSL/TLS certificate management
+    \item Load balancing and scaling
+\end{itemize}
 
 \section{Conclusion}
 
-The Sedaro Violet Platform represents a comprehensive solution for agent template management and simulation control. The implementation demonstrates modern web development practices with a focus on user experience, reliability, and maintainability.
+The Sedaro Violet Platform represents a comprehensive and sophisticated solution for agent template management and simulation control. The implementation demonstrates modern web development practices with a strong focus on user experience, reliability, and maintainability.
 
-Key achievements include:
+\textbf{Key Achievements}:
 \begin{itemize}
-    \item Seamless Sedaro API integration
-    \item Intuitive spreadsheet interface
-    \item Robust state persistence
-    \item Real-time simulation monitoring
-    \item Comprehensive error handling
+    \item \textbf{Seamless Integration}: Direct Sedaro API integration with comprehensive error handling
+    \item \textbf{Intuitive Interface}: Advanced spreadsheet interface with property association capabilities
+    \item \textbf{Robust State Management}: Automatic state persistence and recovery mechanisms
+    \item \textbf{Real-time Monitoring}: Non-blocking simulation progress monitoring with detailed metrics
+    \item \textbf{Advanced Automation}: Intelligent auto-trigger system with validation and error handling
+    \item \textbf{Property Tracking}: Visual management system for tracked properties with real-time status
 \end{itemize}
 
-The platform successfully bridges the gap between complex simulation parameters and user-friendly interface design, enabling efficient workflow management for Sedaro agent templates.
+\textbf{Technical Excellence}:
+\begin{itemize}
+    \item \textbf{Modular Architecture}: Well-structured codebase with clear separation of concerns
+    \item \textbf{Comprehensive Error Handling}: Multi-layered error management with user-friendly feedback
+    \item \textbf{Performance Optimization}: Efficient algorithms and caching strategies
+    \item \textbf{Security Considerations}: Input validation and access control mechanisms
+    \item \textbf{Accessibility}: Keyboard navigation and responsive design
+\end{itemize}
+
+The platform successfully bridges the gap between complex simulation parameters and user-friendly interface design, enabling efficient workflow management for Sedaro agent templates. The combination of advanced features, robust error handling, and intuitive user experience makes it a powerful tool for simulation management and analysis.
 
 \end{document} 
