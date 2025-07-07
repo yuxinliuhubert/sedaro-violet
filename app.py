@@ -765,11 +765,37 @@ def index():
                 border-radius: 5px;
                 border: 1px solid #dee2e6;
             }
-            .editor-section h3 {
-                color: #495057;
+            .editor-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
                 margin-bottom: 1rem;
                 border-bottom: 2px solid #e9ecef;
                 padding-bottom: 0.5rem;
+            }
+            
+            .editor-section h3 {
+                color: #495057;
+                margin: 0;
+            }
+            
+            .close-editor-btn {
+                background: #6c757d;
+                color: white;
+                border: none;
+                border-radius: 50%;
+                width: 30px;
+                height: 30px;
+                cursor: pointer;
+                font-size: 16px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: background 0.2s;
+            }
+            
+            .close-editor-btn:hover {
+                background: #5a6268;
             }
             .property-item {
                 margin-bottom: 1rem;
@@ -1079,6 +1105,21 @@ def index():
                 box-shadow: 0 4px 8px rgba(0,0,0,0.1);
             }
             
+            /* Fix dropdown overflow by making it appear above if there's not enough space below */
+            .property-selector {
+                position: relative;
+                display: inline-block;
+                width: 100%;
+            }
+            
+            .property-dropdown.overflow-up {
+                top: auto;
+                bottom: 100%;
+                border-top: 1px solid #dee2e6;
+                border-bottom: none;
+                border-radius: 4px 4px 0 0;
+            }
+            
             .property-item {
                 padding: 8px 12px;
                 cursor: pointer;
@@ -1129,6 +1170,21 @@ def index():
             
             .action-btn.save:hover {
                 background: #a78bfa;
+            }
+            
+            .track-button {
+                padding: 4px 8px;
+                border: none;
+                border-radius: 3px;
+                cursor: pointer;
+                font-size: 0.8rem;
+                color: white;
+                background: #17a2b8;
+                margin-left: 4px;
+            }
+            
+            .track-button:hover {
+                background: #138496;
             }
             
             .toast-notification {
@@ -1274,28 +1330,32 @@ def index():
                 
                 <div id="componentEditor" style="display: none;">
                     <div class="editor-section">
-                        <h3 id="selectedComponentName">Component Properties</h3>
+                        <div class="editor-header">
+                            <h3 id="selectedComponentName">Component Properties</h3>
+                            <button class="close-editor-btn" onclick="closeComponentEditor()" title="Close editor">
+                                ✕
+                            </button>
+                        </div>
                         <div id="componentProperties"></div>
                     </div>
                 </div>
+            </div>
+            
+            <!-- Tracked Properties Section -->
+            <div class="tracked-properties-section">
+                <h2>📊 Tracked Properties</h2>
+                <p>Properties currently being tracked and managed through the spreadsheet interface:</p>
                 
-                <!-- Tracked Properties Display -->
-                <div class="tracked-properties-section">
-                    <h3>📊 Tracked Properties</h3>
-                    <p>Properties currently being tracked and managed through the spreadsheet interface:</p>
-                    
-                    <div id="trackedPropertiesContainer">
-                        <!-- Tracked properties will be displayed here -->
-                    </div>
-                    
-                    <div id="noTrackedProperties" style="display: none;">
-                        <div class="empty-state">
-                            <p>No properties are currently being tracked.</p>
-                            <p>Add variables in the spreadsheet above to start tracking properties.</p>
-                        </div>
+                <div id="trackedPropertiesContainer">
+                    <!-- Tracked properties will be displayed here -->
+                </div>
+                
+                <div id="noTrackedProperties" style="display: none;">
+                    <div class="empty-state">
+                        <p>No properties are currently being tracked.</p>
+                        <p>Add variables in the spreadsheet above to start tracking properties.</p>
                     </div>
                 </div>
-                            </div>
             </div>
         </div>
 
@@ -2019,6 +2079,10 @@ ${JSON.stringify(result.stats, null, 2)}
                                        ${mutability.mutable ? '' : 'disabled'}>
                                 <button onclick="saveComponentProperty('${propertyName}', this)" class="save-button"
                                         ${mutability.mutable ? '' : 'disabled'}>Save</button>
+                                <button onclick="trackPropertyFromExplorer('${propertyName}', null, '${propertyName}')" 
+                                        class="track-button" title="Track this property in spreadsheet">
+                                    📊 Track
+                                </button>
                             </div>
                         </div>
                     `;
@@ -2043,6 +2107,10 @@ ${JSON.stringify(result.stats, null, 2)}
                                                ${mutability.mutable ? '' : 'disabled'}>
                                         <button onclick="saveComponentProperty('${key}', this)" class="save-button"
                                                 ${mutability.mutable ? '' : 'disabled'}>Save</button>
+                                        <button onclick="trackPropertyFromExplorer('${key}', '${component.id}', '${component.name}.${key}')" 
+                                                class="track-button" title="Track this property in spreadsheet">
+                                            📊 Track
+                                        </button>
                                     </div>
                                 </div>
                             `;
@@ -2171,6 +2239,123 @@ ${JSON.stringify(result.stats, null, 2)}
                 } catch (error) {
                     showToast('Failed to save property: ' + error.message, 'error');
                 }
+            }
+
+            function trackPropertyFromExplorer(propertyName, blockId, displayName) {
+                // Normalize display name to match spreadsheet format
+                let normalizedDisplayName = displayName;
+                if (!blockId) {
+                    // For root properties, ensure we use the "(root)" suffix to match spreadsheet format
+                    if (!displayName.includes('(root)')) {
+                        normalizedDisplayName = `${displayName} (root)`;
+                    }
+                }
+                
+                // Check if this property is already being tracked
+                const existingRowId = findExistingTrackedProperty(propertyName, blockId);
+                
+                if (existingRowId) {
+                    showToast('This property is already being tracked in the spreadsheet', 'info');
+                    // Scroll to the existing row
+                    const row = document.getElementById(`row-${existingRowId}`);
+                    if (row) {
+                        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        row.style.backgroundColor = '#fff3cd';
+                        setTimeout(() => {
+                            row.style.backgroundColor = '';
+                        }, 2000);
+                    }
+                    return;
+                }
+                
+                // Find an empty row or add a new one
+                let targetRowId = null;
+                for (const [rowId, data] of Object.entries(spreadsheetData)) {
+                    if (!data.name || data.name.trim() === '') {
+                        targetRowId = rowId;
+                        break;
+                    }
+                }
+                
+                if (!targetRowId) {
+                    // Add a new row
+                    addSpreadsheetRow();
+                    // Get the ID of the newly added row
+                    const rows = document.querySelectorAll('#bomTableBody tr');
+                    targetRowId = rows[rows.length - 1].id.replace('row-', '');
+                }
+                
+                // Set up the tracking data
+                const propertyData = {
+                    name: propertyName,
+                    displayName: normalizedDisplayName,
+                    isBlock: blockId !== null,
+                    blockId: blockId,
+                    id: blockId
+                };
+                
+                // Update the spreadsheet data
+                spreadsheetData[targetRowId] = {
+                    name: propertyName,
+                    value: '',
+                    associatedProperty: propertyData,
+                    autoTrigger: false,
+                    lastAppliedValue: null
+                };
+                
+                // Update the UI
+                const row = document.getElementById(`row-${targetRowId}`);
+                if (row) {
+                    const nameInput = row.querySelector('td:nth-child(1) input');
+                    const propertyInput = row.querySelector('td:nth-child(3) input');
+                    
+                    if (nameInput) nameInput.value = propertyName;
+                    if (propertyInput) propertyInput.value = displayName;
+                }
+                
+                // Update the tracked properties display
+                updateTrackedPropertiesDisplay();
+                
+                // Save state
+                saveState();
+                
+                // Scroll to the spreadsheet
+                const spreadsheetSection = document.querySelector('.bom-spreadsheet');
+                if (spreadsheetSection) {
+                    spreadsheetSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+                
+                showToast(`Property "${propertyName}" is now being tracked in the spreadsheet`, 'success');
+            }
+            
+            function findExistingTrackedProperty(propertyName, blockId) {
+                for (const [rowId, data] of Object.entries(spreadsheetData)) {
+                    if (data.associatedProperty) {
+                        const prop = data.associatedProperty;
+                        // Check if this is the same property by name and block ID, regardless of display name
+                        if (prop.name === propertyName && prop.blockId === blockId) {
+                            return rowId;
+                        }
+                    }
+                }
+                return null;
+            }
+            
+            function closeComponentEditor() {
+                // Hide the component editor
+                document.getElementById('componentEditor').style.display = 'none';
+                
+                // Clear the search input
+                document.getElementById('searchInput').value = '';
+                
+                // Clear the selected component
+                selectedComponent = null;
+                
+                // Show the dropdown list again
+                document.getElementById('dropdownList').style.display = 'block';
+                
+                // Show a brief message
+                showToast('Component editor closed', 'info');
             }
 
             // Close dropdown when clicking outside
@@ -2594,6 +2779,18 @@ ${JSON.stringify(result.stats, null, 2)}
                     dropdown.appendChild(loadingItem);
                 }
                 
+                // Check available space and position dropdown accordingly
+                const rect = dropdown.getBoundingClientRect();
+                const viewportHeight = window.innerHeight;
+                const dropdownHeight = 200; // max-height of dropdown
+                
+                // If there's not enough space below, show dropdown above
+                if (rect.bottom + dropdownHeight > viewportHeight) {
+                    dropdown.classList.add('overflow-up');
+                } else {
+                    dropdown.classList.remove('overflow-up');
+                }
+                
                 dropdown.style.display = 'block';
                 
                 // Close dropdown when clicking outside
@@ -2758,7 +2955,7 @@ ${JSON.stringify(result.stats, null, 2)}
                 
                 for (const [rowId, data] of Object.entries(spreadsheetData)) {
                     if (data.name && data.associatedProperty) {
-                        // Create a unique key for this property association
+                        // Create a unique key for this property association using name and block ID
                         const propertyKey = `${data.associatedProperty.blockId || 'root'}-${data.associatedProperty.name}`;
                         
                         // Only add if we haven't seen this property before
