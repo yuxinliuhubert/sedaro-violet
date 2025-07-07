@@ -786,6 +786,207 @@ def index():
             .detail-item strong {
                 color: #495057;
             }
+            
+            /* BOM Spreadsheet Styles */
+            .bom-spreadsheet {
+                margin-top: 3rem;
+                padding: 2rem;
+                border: 2px solid #e9ecef;
+                border-radius: 8px;
+                background: #f8f9fa;
+            }
+            
+            .bom-spreadsheet h2 {
+                color: #495057;
+                margin-bottom: 1rem;
+            }
+            
+            .spreadsheet-controls {
+                display: flex;
+                align-items: center;
+                gap: 1rem;
+                margin-bottom: 1.5rem;
+                flex-wrap: wrap;
+            }
+            
+            .toggle-container {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                font-weight: bold;
+                color: #495057;
+                cursor: pointer;
+            }
+            
+            .toggle-slider {
+                position: relative;
+                width: 50px;
+                height: 24px;
+                background: #ccc;
+                border-radius: 12px;
+                transition: background 0.3s;
+            }
+            
+            .toggle-slider:before {
+                content: '';
+                position: absolute;
+                width: 20px;
+                height: 20px;
+                border-radius: 50%;
+                top: 2px;
+                left: 2px;
+                background: white;
+                transition: transform 0.3s;
+            }
+            
+            #autoSimToggle:checked + .toggle-slider {
+                background: #c3adff;
+            }
+            
+            #autoSimToggle:checked + .toggle-slider:before {
+                transform: translateX(26px);
+            }
+            
+            #autoSimToggle {
+                display: none;
+            }
+            
+            .spreadsheet-container {
+                background: white;
+                border-radius: 8px;
+                overflow: hidden;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            }
+            
+            .spreadsheet-table {
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 0.9rem;
+            }
+            
+            .spreadsheet-table th {
+                background: #c3adff;
+                color: white;
+                padding: 12px 8px;
+                text-align: left;
+                font-weight: bold;
+                border-bottom: 2px solid #a78bfa;
+            }
+            
+            .spreadsheet-table td {
+                padding: 8px;
+                border-bottom: 1px solid #e9ecef;
+                vertical-align: middle;
+            }
+            
+            .spreadsheet-table tr:hover {
+                background: #f8f9fa;
+            }
+            
+            .spreadsheet-input {
+                width: 100%;
+                padding: 6px 8px;
+                border: 1px solid #dee2e6;
+                border-radius: 4px;
+                font-size: 0.9rem;
+                box-sizing: border-box;
+            }
+            
+            .spreadsheet-input:focus {
+                outline: none;
+                border-color: #c3adff;
+                box-shadow: 0 0 0 2px rgba(195, 173, 255, 0.2);
+            }
+            
+            .property-selector {
+                position: relative;
+                display: inline-block;
+                width: 100%;
+            }
+            
+            .property-selector input {
+                width: 100%;
+                padding: 6px 8px;
+                border: 1px solid #dee2e6;
+                border-radius: 4px;
+                font-size: 0.9rem;
+                cursor: pointer;
+                background: white;
+            }
+            
+            .property-selector input:focus {
+                outline: none;
+                border-color: #c3adff;
+            }
+            
+            .property-dropdown {
+                position: absolute;
+                top: 100%;
+                left: 0;
+                right: 0;
+                background: white;
+                border: 1px solid #dee2e6;
+                border-top: none;
+                border-radius: 0 0 4px 4px;
+                max-height: 200px;
+                overflow-y: auto;
+                z-index: 1000;
+                display: none;
+                box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            }
+            
+            .property-item {
+                padding: 8px 12px;
+                cursor: pointer;
+                border-bottom: 1px solid #f8f9fa;
+                font-size: 0.85rem;
+            }
+            
+            .property-item:hover {
+                background: #f8f9fa;
+            }
+            
+            .property-item.selected {
+                background: #c3adff;
+                color: white;
+            }
+            
+            .property-path {
+                color: #6c757d;
+                font-size: 0.8rem;
+                margin-top: 2px;
+            }
+            
+            .action-buttons {
+                display: flex;
+                gap: 4px;
+            }
+            
+            .action-btn {
+                padding: 4px 8px;
+                border: none;
+                border-radius: 3px;
+                cursor: pointer;
+                font-size: 0.8rem;
+                color: white;
+            }
+            
+            .action-btn.delete {
+                background: #dc3545;
+            }
+            
+            .action-btn.delete:hover {
+                background: #c82333;
+            }
+            
+            .action-btn.save {
+                background: #c3adff;
+            }
+            
+            .action-btn.save:hover {
+                background: #a78bfa;
+            }
+            
             .toast-notification {
                 position: fixed;
                 top: 20px;
@@ -811,6 +1012,10 @@ def index():
             .toast-notification.error {
                 background: #dc3545;
                 border-left: 4px solid #c82333;
+            }
+            .toast-notification.info {
+                background: #17a2b8;
+                border-left: 4px solid #138496;
             }
             .toast-notification .toast-icon {
                 margin-right: 0.5rem;
@@ -876,9 +1081,45 @@ def index():
             <div id="content" style="display: none;"></div>
             <div id="simulationStatus" style="display: none;"></div>
             
+            <!-- BOM to Simulation Spreadsheet -->
+            <div class="bom-spreadsheet">
+                <h2>BOM to Simulation Interface</h2>
+                <p>Define input variables and associate them with template properties for automatic simulation triggering:</p>
+                
+                <div class="spreadsheet-controls">
+                    <label class="toggle-container">
+                        <input type="checkbox" id="autoSimToggle">
+                        <span class="toggle-slider"></span>
+                        Auto-trigger simulation on changes
+                    </label>
+                    <button id="addRowBtn" class="save-button" onclick="addSpreadsheetRow()" style="background: #c3adff;">
+                        ➕ Add Row
+                    </button>
+                    <button id="clearAllBtn" class="save-button" onclick="clearSpreadsheet()" style="background: #6c757d;">
+                        🗑️ Clear All
+                    </button>
+                </div>
+                
+                <div class="spreadsheet-container">
+                    <table id="bomTable" class="spreadsheet-table">
+                        <thead>
+                            <tr>
+                                <th>Variable Name</th>
+                                <th>Input Value</th>
+                                <th>Associated Template Property</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bomTableBody">
+                            <!-- Rows will be added here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
             <!-- Interactive Template Explorer -->
             <div class="template-explorer">
-                <h2>🔍 Interactive Template Explorer</h2>
+                <h2>Interactive Template Explorer</h2>
                 <p>Select a component from the dropdown and edit its properties:</p>
                 
                 <div class="component-selector">
@@ -923,6 +1164,114 @@ def index():
             let currentPropertyName = null;
             let currentSimulationId = null;
             let progressInterval = null;
+            let spreadsheetData = {};
+            let allTemplateProperties = [];
+            
+            // State persistence functions
+            function saveState() {
+                const state = {
+                    currentSimulationId: currentSimulationId,
+                    spreadsheetData: spreadsheetData,
+                    autoSimEnabled: document.getElementById('autoSimToggle')?.checked || false
+                };
+                localStorage.setItem('sedaroVioletState', JSON.stringify(state));
+            }
+            
+            function loadState() {
+                try {
+                    const savedState = localStorage.getItem('sedaroVioletState');
+                    if (savedState) {
+                        const state = JSON.parse(savedState);
+                        
+                        // Restore simulation ID
+                        if (state.currentSimulationId) {
+                            currentSimulationId = state.currentSimulationId;
+                            // Check if simulation is still running
+                            checkAndRestoreSimulation(state.currentSimulationId);
+                        }
+                        
+                        // Restore spreadsheet data
+                        if (state.spreadsheetData) {
+                            spreadsheetData = state.spreadsheetData;
+                            restoreSpreadsheetUI();
+                        }
+                        
+                        // Restore auto-sim toggle
+                        if (state.autoSimEnabled !== undefined) {
+                            const autoSimToggle = document.getElementById('autoSimToggle');
+                            if (autoSimToggle) {
+                                autoSimToggle.checked = state.autoSimEnabled;
+                            }
+                        }
+                        
+                        console.log('State restored from localStorage');
+                    }
+                } catch (error) {
+                    console.error('Error loading state:', error);
+                    // Clear corrupted state
+                    localStorage.removeItem('sedaroVioletState');
+                }
+            }
+            
+            async function checkAndRestoreSimulation(simulationId) {
+                try {
+                    const response = await fetch(`/api/simulation_status?simulation_id=${simulationId}`);
+                    const result = await response.json();
+                    
+                    if (result.success && !result.is_complete) {
+                        // Simulation is still running, restore progress monitoring
+                        const progressDiv = document.getElementById('simulationProgress');
+                        if (progressDiv) {
+                            progressDiv.style.display = 'block';
+                        }
+                        startProgressMonitoring(simulationId);
+                        showToast('Restored simulation monitoring', 'info');
+                    } else {
+                        // Simulation is complete or doesn't exist, clear the ID
+                        currentSimulationId = null;
+                        saveState();
+                    }
+                } catch (error) {
+                    console.error('Error checking simulation status:', error);
+                    currentSimulationId = null;
+                    saveState();
+                }
+            }
+            
+            function restoreSpreadsheetUI() {
+                const tbody = document.getElementById('bomTableBody');
+                if (!tbody) return;
+                
+                // Clear existing rows
+                tbody.innerHTML = '';
+                
+                // Restore rows from saved data
+                for (const [rowId, data] of Object.entries(spreadsheetData)) {
+                    addSpreadsheetRow(rowId, data);
+                }
+                
+                // Add empty rows if needed to maintain minimum of 5 rows
+                const currentRows = Object.keys(spreadsheetData).length;
+                for (let i = currentRows; i < 5; i++) {
+                    addSpreadsheetRow();
+                }
+            }
+            
+            // Save state periodically and on important events
+            function setupStatePersistence() {
+                // Save state every 5 seconds
+                setInterval(saveState, 5000);
+                
+                // Save state on page unload
+                window.addEventListener('beforeunload', saveState);
+                
+                // Save state when spreadsheet data changes
+                const originalUpdateSpreadsheetData = updateSpreadsheetData;
+                updateSpreadsheetData = function(rowId, field, value) {
+                    originalUpdateSpreadsheetData(rowId, field, value);
+                    saveState();
+                };
+            }
 
             async function loadBlocks() {
                 try {
@@ -1097,6 +1446,22 @@ def index():
                         progressInterval = null;
                     }
                 }, 2000);
+                
+                // Safety timeout: stop polling after 30 minutes (1800 seconds) to prevent infinite polling
+                setTimeout(() => {
+                    if (progressInterval) {
+                        console.warn('Stopping simulation monitoring due to timeout (30 minutes)');
+                        clearInterval(progressInterval);
+                        progressInterval = null;
+                        showToast('Simulation monitoring stopped due to timeout', 'info');
+                        
+                        // Update UI to show timeout
+                        const statusText = document.getElementById('statusText');
+                        if (statusText) {
+                            statusText.textContent = '⏰ Simulation monitoring timed out after 30 minutes';
+                        }
+                    }
+                }, 30 * 60 * 1000); // 30 minutes
             }
 
             async function updateProgress(simulationId) {
@@ -1166,11 +1531,15 @@ def index():
                         return false; // Continue polling
                     } else {
                         console.error('Failed to get simulation status:', result.error);
-                        return false;
+                        // If we can't get status, stop polling to avoid infinite loops
+                        showToast('Failed to get simulation status, stopping monitoring', 'error');
+                        return true; // Stop polling
                     }
                 } catch (error) {
                     console.error('Error checking simulation status:', error);
-                    return false;
+                    // If there's a network error, stop polling to avoid infinite loops
+                    showToast('Error checking simulation status, stopping monitoring', 'error');
+                    return true; // Stop polling
                 }
             }
 
@@ -1291,6 +1660,8 @@ ${JSON.stringify(result.stats, null, 2)}
                     icon.textContent = '✅';
                 } else if (type === 'error') {
                     icon.textContent = '❌';
+                } else if (type === 'info') {
+                    icon.textContent = 'ℹ️';
                 }
                 
                 // Show toast
@@ -1645,8 +2016,19 @@ ${JSON.stringify(result.stats, null, 2)}
 
             // Load components when page loads
             document.addEventListener('DOMContentLoaded', function() {
+                // Load saved state first
+                loadState();
+                
                 loadBlocks();
                 loadComponents();
+                
+                // Initialize spreadsheet after a short delay to ensure template properties are loaded
+                setTimeout(() => {
+                    initializeSpreadsheet();
+                    
+                    // Setup state persistence after everything is initialized
+                    setupStatePersistence();
+                }, 500);
             });
 
             async function refreshTemplate() {
@@ -1678,6 +2060,718 @@ ${JSON.stringify(result.stats, null, 2)}
                 } finally {
                     refreshBtn.disabled = false;
                     refreshBtn.textContent = '🔄 Refresh Template';
+                }
+            }
+
+            // BOM Spreadsheet Functions
+            async function initializeSpreadsheet() {
+                console.log('Initializing spreadsheet...');
+                
+                // Load template properties first
+                await loadTemplateProperties();
+                
+                // Only add initial rows if we don't have saved data
+                if (Object.keys(spreadsheetData).length === 0) {
+                    // Add 5 initial rows
+                    for (let i = 0; i < 5; i++) {
+                        addSpreadsheetRow();
+                    }
+                } else {
+                    // Restore the saved spreadsheet UI
+                    restoreSpreadsheetUI();
+                }
+                
+                console.log('Spreadsheet initialized with', allTemplateProperties.length, 'properties available');
+            }
+
+            function addSpreadsheetRow(restoreRowId = null, restoreData = null) {
+                const tbody = document.getElementById('bomTableBody');
+                const rowId = restoreRowId || Math.floor(Math.random() * 1000000); // Use provided ID or generate new one
+                
+                const row = document.createElement('tr');
+                row.id = `row-${rowId}`;
+                row.innerHTML = `
+                    <td>
+                        <input type="text" class="spreadsheet-input" placeholder="Variable name" 
+                               onchange="updateSpreadsheetData('${rowId}', 'name', this.value)">
+                    </td>
+                    <td>
+                        <input type="text" class="spreadsheet-input" placeholder="Input value" 
+                               onchange="updateSpreadsheetData('${rowId}', 'value', this.value)">
+                    </td>
+                    <td>
+                        <div class="property-selector">
+                            <input type="text" placeholder="Click to select template property" readonly
+                                   onclick="showPropertyDropdown('${rowId}')">
+                            <div class="property-dropdown" id="dropdown-${rowId}"></div>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="action-btn save" onclick="saveProperty('${rowId}')">
+                                💾 Save
+                            </button>
+                            <button class="action-btn delete" onclick="deleteRow('${rowId}')">
+                                🗑️
+                            </button>
+                        </div>
+                    </td>
+                `;
+                
+                tbody.appendChild(row);
+                
+                // Initialize data for this row
+                if (restoreData) {
+                    spreadsheetData[rowId] = restoreData;
+                    
+                    // Restore the input values
+                    const nameInput = row.querySelector('td:nth-child(1) input');
+                    const valueInput = row.querySelector('td:nth-child(2) input');
+                    const propertyInput = row.querySelector('td:nth-child(3) input');
+                    
+                    if (nameInput && restoreData.name) {
+                        nameInput.value = restoreData.name;
+                    }
+                    if (valueInput && restoreData.value) {
+                        valueInput.value = restoreData.value;
+                    }
+                    if (propertyInput && restoreData.associatedProperty) {
+                        propertyInput.value = restoreData.associatedProperty.displayName;
+                    }
+                } else {
+                    spreadsheetData[rowId] = {
+                        name: '',
+                        value: '',
+                        associatedProperty: null,
+                        lastAppliedValue: null
+                    };
+                }
+                
+                console.log('Added spreadsheet row with ID:', rowId, restoreData ? '(restored)' : '(new)');
+            }
+
+            function deleteRow(rowId) {
+                const row = document.getElementById(`row-${rowId}`);
+                if (row) {
+                    row.remove();
+                    delete spreadsheetData[rowId];
+                    saveState();
+                }
+            }
+
+            function clearSpreadsheet() {
+                if (confirm('Are you sure you want to clear all rows?')) {
+                    const tbody = document.getElementById('bomTableBody');
+                    tbody.innerHTML = '';
+                    spreadsheetData = {};
+                    
+                    // Re-add 5 empty rows
+                    for (let i = 0; i < 5; i++) {
+                        addSpreadsheetRow();
+                    }
+                    
+                    saveState();
+                }
+            }
+
+            async function loadTemplateProperties() {
+                try {
+                    console.log('Loading template properties...');
+                    const response = await fetch('/api/template_structure');
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        allTemplateProperties = extractAllProperties(result.data);
+                        console.log('Loaded template properties:', allTemplateProperties);
+                        console.log('Total properties found:', allTemplateProperties.length);
+                    } else {
+                        console.error('Failed to load template structure:', result.error);
+                    }
+                } catch (error) {
+                    console.error('Failed to load template properties:', error);
+                }
+            }
+
+            function extractAllProperties(data, prefix = '') {
+                let properties = [];
+                
+                if (typeof data === 'object' && data !== null) {
+                    if (Array.isArray(data)) {
+                        data.forEach((item, index) => {
+                            const path = prefix ? `${prefix}.${index}` : `${index}`;
+                            if (typeof item === 'object' && item !== null) {
+                                if (item.id && item.type) {
+                                    // This is a block/component - add it and also drill into its properties
+                                    properties.push({
+                                        path: path,
+                                        id: item.id,
+                                        name: item.name || `${item.type}_${item.id}`,
+                                        type: item.type,
+                                        displayName: `${item.name || item.type} (${item.id})`,
+                                        isBlock: true
+                                    });
+                                    
+                                    // Drill into the block's properties
+                                    if (item.data) {
+                                        Object.keys(item.data).forEach(propKey => {
+                                            if (!propKey.startsWith('_') && propKey !== 'id' && propKey !== 'type') {
+                                                const propValue = item.data[propKey];
+                                                const propPath = `${path}.${propKey}`;
+                                                properties.push({
+                                                    path: propPath,
+                                                    id: item.id,
+                                                    name: propKey,
+                                                    value: propValue,
+                                                    displayName: `${item.name || item.type}.${propKey}`,
+                                                    isBlock: false,
+                                                    blockId: item.id
+                                                });
+                                            }
+                                        });
+                                    }
+                                }
+                                // Recursively extract from nested objects
+                                properties = properties.concat(extractAllProperties(item, path));
+                            }
+                        });
+                    } else {
+                        Object.keys(data).forEach(key => {
+                            const path = prefix ? `${prefix}.${key}` : key;
+                            const value = data[key];
+                            
+                            if (typeof value === 'object' && value !== null) {
+                                if (value.id && value.type) {
+                                    // This is a block/component - add it and also drill into its properties
+                                    properties.push({
+                                        path: path,
+                                        id: value.id,
+                                        name: value.name || `${value.type}_${value.id}`,
+                                        type: value.type,
+                                        displayName: `${value.name || value.type} (${value.id})`,
+                                        isBlock: true
+                                    });
+                                    
+                                    // Drill into the block's properties
+                                    if (value.data) {
+                                        Object.keys(value.data).forEach(propKey => {
+                                            if (!propKey.startsWith('_') && propKey !== 'id' && propKey !== 'type') {
+                                                const propValue = value.data[propKey];
+                                                const propPath = `${path}.${propKey}`;
+                                                properties.push({
+                                                    path: propPath,
+                                                    id: value.id,
+                                                    name: propKey,
+                                                    value: propValue,
+                                                    displayName: `${value.name || value.type}.${propKey}`,
+                                                    isBlock: false,
+                                                    blockId: value.id
+                                                });
+                                            }
+                                        });
+                                    }
+                                }
+                                // Recursively extract from nested objects
+                                properties = properties.concat(extractAllProperties(value, path));
+                            } else if (prefix === '' && (typeof value === 'number' || typeof value === 'string' || typeof value === 'boolean')) {
+                                // Root-level properties
+                                properties.push({
+                                    path: path,
+                                    name: key,
+                                    value: value,
+                                    displayName: `${key} (root)`,
+                                    isBlock: false
+                                });
+                            }
+                        });
+                    }
+                }
+                
+                return properties;
+            }
+
+            function showPropertyDropdown(rowId) {
+                console.log('=== showPropertyDropdown called ===');
+                console.log('Row ID:', rowId, 'Type:', typeof rowId);
+                console.log('Available properties:', allTemplateProperties);
+                console.log('Properties length:', allTemplateProperties ? allTemplateProperties.length : 'undefined');
+                
+                const dropdown = document.getElementById(`dropdown-${rowId}`);
+                const input = dropdown ? dropdown.previousElementSibling : null;
+                
+                console.log('Found dropdown:', dropdown);
+                console.log('Found input:', input);
+                
+                if (!dropdown) {
+                    console.error('Could not find dropdown for row:', rowId);
+                    return;
+                }
+                
+                // Clear previous content
+                dropdown.innerHTML = '';
+                
+                // Add search functionality
+                const searchInput = document.createElement('input');
+                searchInput.type = 'text';
+                searchInput.placeholder = 'Search properties...';
+                searchInput.className = 'spreadsheet-input';
+                searchInput.style = 'margin-bottom: 8px;';
+                searchInput.onkeyup = function() {
+                    filterPropertyDropdown(dropdown, this.value);
+                };
+                dropdown.appendChild(searchInput);
+                
+                // Add property items
+                if (allTemplateProperties && allTemplateProperties.length > 0) {
+                    // Group properties by type for better organization
+                    const rootProperties = allTemplateProperties.filter(p => !p.isBlock && !p.blockId);
+                    const blockProperties = allTemplateProperties.filter(p => p.isBlock);
+                    const drilledProperties = allTemplateProperties.filter(p => !p.isBlock && p.blockId);
+                    
+                    // Add root properties first
+                    if (rootProperties.length > 0) {
+                        const rootHeader = document.createElement('div');
+                        rootHeader.className = 'property-item';
+                        rootHeader.style = 'background: #f8f9fa; font-weight: bold; color: #495057;';
+                        rootHeader.innerHTML = '<div>🌐 Root Properties</div>';
+                        dropdown.appendChild(rootHeader);
+                        
+                        rootProperties.forEach(prop => {
+                            const item = document.createElement('div');
+                            item.className = 'property-item';
+                            item.style = 'padding-left: 20px;';
+                            item.innerHTML = `
+                                <div>${prop.displayName}</div>
+                                <div class="property-path">${prop.path}</div>
+                            `;
+                            item.onclick = function(e) {
+                                e.stopPropagation();
+                                console.log('Property item clicked:', prop);
+                                selectProperty(rowId, prop);
+                            };
+                            dropdown.appendChild(item);
+                        });
+                    }
+                    
+                    // Add drilled-down block properties
+                    if (drilledProperties.length > 0) {
+                        const blockHeader = document.createElement('div');
+                        blockHeader.className = 'property-item';
+                        blockHeader.style = 'background: #f8f9fa; font-weight: bold; color: #495057;';
+                        blockHeader.innerHTML = '<div>🔧 Block Properties</div>';
+                        dropdown.appendChild(blockHeader);
+                        
+                        drilledProperties.forEach(prop => {
+                            const item = document.createElement('div');
+                            item.className = 'property-item';
+                            item.style = 'padding-left: 20px;';
+                            item.innerHTML = `
+                                <div>${prop.displayName}</div>
+                                <div class="property-path">${prop.path}</div>
+                            `;
+                            item.onclick = function(e) {
+                                e.stopPropagation();
+                                console.log('Property item clicked:', prop);
+                                selectProperty(rowId, prop);
+                            };
+                            dropdown.appendChild(item);
+                        });
+                    }
+                    
+                    // Add block components with expand functionality
+                    if (blockProperties.length > 0) {
+                        const compHeader = document.createElement('div');
+                        compHeader.className = 'property-item';
+                        compHeader.style = 'background: #f8f9fa; font-weight: bold; color: #495057;';
+                        compHeader.innerHTML = '<div>📦 Block Components (Click to expand)</div>';
+                        dropdown.appendChild(compHeader);
+                        
+                        blockProperties.forEach(prop => {
+                            const item = document.createElement('div');
+                            item.className = 'property-item';
+                            item.style = 'padding-left: 20px;';
+                            item.innerHTML = `
+                                <div>${prop.displayName} ▶️</div>
+                                <div class="property-path">${prop.path}</div>
+                            `;
+                            item.onclick = function(e) {
+                                e.stopPropagation();
+                                console.log('Block component clicked, expanding:', prop);
+                                expandBlockComponent(rowId, prop, dropdown);
+                            };
+                            dropdown.appendChild(item);
+                        });
+                    }
+                } else {
+                    // Show loading message if no properties available
+                    const loadingItem = document.createElement('div');
+                    loadingItem.className = 'property-item';
+                    loadingItem.innerHTML = '<div>Loading properties...</div>';
+                    dropdown.appendChild(loadingItem);
+                }
+                
+                dropdown.style.display = 'block';
+                
+                // Close dropdown when clicking outside
+                setTimeout(() => {
+                    document.addEventListener('click', function closeDropdown(e) {
+                        if (!dropdown.contains(e.target) && !input.contains(e.target)) {
+                            dropdown.style.display = 'none';
+                            document.removeEventListener('click', closeDropdown);
+                        }
+                    });
+                }, 100);
+            }
+
+            async function expandBlockComponent(rowId, blockProp, dropdown) {
+                console.log('Expanding block component:', blockProp);
+                
+                try {
+                    // Get the block's properties from the server
+                    const response = await fetch(`/api/block/${blockProp.id}/properties`);
+                    const result = await response.json();
+                    
+                    if (result && typeof result === 'object') {
+                        // Clear the dropdown and show block properties
+                        dropdown.innerHTML = '';
+                        
+                        // Add back button
+                        const backButton = document.createElement('div');
+                        backButton.className = 'property-item';
+                        backButton.style = 'background: #e9ecef; font-weight: bold; color: #495057; cursor: pointer;';
+                        backButton.innerHTML = '<div>← Back to all properties</div>';
+                        backButton.onclick = function(e) {
+                            e.stopPropagation();
+                            showPropertyDropdown(rowId);
+                        };
+                        dropdown.appendChild(backButton);
+                        
+                        // Add header
+                        const header = document.createElement('div');
+                        header.className = 'property-item';
+                        header.style = 'background: #f8f9fa; font-weight: bold; color: #495057;';
+                        header.innerHTML = `<div>🔧 ${blockProp.displayName} Properties</div>`;
+                        dropdown.appendChild(header);
+                        
+                        // Add each property
+                        Object.keys(result).forEach(propKey => {
+                            if (!propKey.startsWith('_') && propKey !== 'id' && propKey !== 'type') {
+                                const propValue = result[propKey];
+                                const item = document.createElement('div');
+                                item.className = 'property-item';
+                                item.style = 'padding-left: 20px;';
+                                item.innerHTML = `
+                                    <div>${propKey}</div>
+                                    <div class="property-path">Current: ${JSON.stringify(propValue)}</div>
+                                `;
+                                item.onclick = function(e) {
+                                    e.stopPropagation();
+                                    const property = {
+                                        path: `${blockProp.path}.${propKey}`,
+                                        id: blockProp.id,
+                                        name: propKey,
+                                        value: propValue,
+                                        displayName: `${blockProp.displayName}.${propKey}`,
+                                        isBlock: false,
+                                        blockId: blockProp.id
+                                    };
+                                    console.log('Block property selected:', property);
+                                    selectProperty(rowId, property);
+                                };
+                                dropdown.appendChild(item);
+                            }
+                        });
+                    } else {
+                        console.error('Failed to get block properties:', result);
+                    }
+                } catch (error) {
+                    console.error('Error expanding block component:', error);
+                    // Show error in dropdown
+                    dropdown.innerHTML = '<div class="property-item">Error loading block properties</div>';
+                }
+            }
+
+            function filterPropertyDropdown(dropdown, searchTerm) {
+                const items = dropdown.querySelectorAll('.property-item');
+                const searchLower = searchTerm.toLowerCase();
+                
+                items.forEach(item => {
+                    const text = item.textContent.toLowerCase();
+                    if (text.includes(searchLower)) {
+                        item.style.display = 'block';
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+            }
+
+            function selectProperty(rowId, property) {
+                console.log('Selecting property:', property, 'for row:', rowId);
+                
+                const input = document.querySelector(`#row-${rowId} .property-selector input`);
+                const dropdown = document.getElementById(`dropdown-${rowId}`);
+                
+                if (!input) {
+                    console.error('Could not find input field for row:', rowId);
+                    return;
+                }
+                
+                if (!dropdown) {
+                    console.error('Could not find dropdown for row:', rowId);
+                    return;
+                }
+                
+                // Update the input field
+                input.value = property.displayName;
+                
+                // Update the spreadsheet data
+                if (!spreadsheetData[rowId]) {
+                    spreadsheetData[rowId] = {};
+                }
+                spreadsheetData[rowId].associatedProperty = property;
+                
+                // Hide the dropdown
+                dropdown.style.display = 'none';
+                
+                // Show success message
+                showToast(`Associated with ${property.displayName}`, 'success');
+                
+                // Apply the current value if auto-sim is enabled
+                if (document.getElementById('autoSimToggle').checked) {
+                    applySpreadsheetChanges();
+                }
+            }
+
+            function updateSpreadsheetData(rowId, field, value) {
+                if (!spreadsheetData[rowId]) {
+                    spreadsheetData[rowId] = {};
+                }
+                spreadsheetData[rowId][field] = value;
+                
+                // Check if auto-sim is enabled and we have both name and associated property
+                if (document.getElementById('autoSimToggle').checked && 
+                    spreadsheetData[rowId].name && 
+                    spreadsheetData[rowId].associatedProperty) {
+                    applySpreadsheetChanges();
+                }
+            }
+
+            async function applySpreadsheetChanges() {
+                const autoSimEnabled = document.getElementById('autoSimToggle').checked;
+                if (!autoSimEnabled) return;
+                
+                let hasChanges = false;
+                let hasErrors = false;
+                
+                for (const [rowId, data] of Object.entries(spreadsheetData)) {
+                    if (data.name && data.value && data.associatedProperty) {
+                        const currentValue = parseValue(data.value);
+                        const lastValue = data.lastAppliedValue;
+                        
+                        // Check if value has actually changed locally
+                        if (JSON.stringify(currentValue) !== JSON.stringify(lastValue)) {
+                            try {
+                                let updateResponse;
+                                
+                                if (data.associatedProperty.isBlock) {
+                                    // Update block property
+                                    updateResponse = await fetch('/api/update_property', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({
+                                            block_id: data.associatedProperty.id,
+                                            property_name: data.associatedProperty.name,
+                                            new_value: currentValue
+                                        })
+                                    });
+                                } else if (data.associatedProperty.blockId) {
+                                    // Update block property (drilled down)
+                                    updateResponse = await fetch('/api/update_property', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({
+                                            block_id: data.associatedProperty.blockId,
+                                            property_name: data.associatedProperty.name,
+                                            new_value: currentValue
+                                        })
+                                    });
+                                } else {
+                                    // Update root property
+                                    updateResponse = await fetch('/api/update_root_property', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({
+                                            property_name: data.associatedProperty.name,
+                                            new_value: currentValue
+                                        })
+                                    });
+                                }
+                                
+                                const updateResult = await updateResponse.json();
+                                
+                                if (updateResult.success) {
+                                    // Check if the property actually changed on the server
+                                    const actualChanged = updateResult.updated_value !== data.lastAppliedValue;
+                                    
+                                    if (actualChanged) {
+                                        hasChanges = true;
+                                        showToast(`Updated ${data.name} to ${data.value}`, 'success');
+                                    } else {
+                                        showToast(`No change needed for ${data.name}`, 'info');
+                                    }
+                                    
+                                    // Update last applied value with the actual server value
+                                    spreadsheetData[rowId].lastAppliedValue = updateResult.updated_value;
+                                } else {
+                                    hasErrors = true;
+                                    showToast(`Failed to update ${data.name}: ${updateResult.error}`, 'error');
+                                }
+                            } catch (error) {
+                                hasErrors = true;
+                                showToast(`Failed to update ${data.name}: ${error.message}`, 'error');
+                            }
+                        }
+                    }
+                }
+                
+                // Only trigger simulation if we actually had changes on the server AND no errors occurred
+                if (hasChanges && !hasErrors) {
+                    setTimeout(() => {
+                        startSimulation();
+                    }, 1000); // Small delay to ensure all updates are processed
+                } else if (hasErrors) {
+                    showToast('Simulation skipped due to update errors', 'error');
+                }
+            }
+
+            function parseValue(value) {
+                // Try to convert to appropriate type
+                if (value === 'true' || value === 'false') {
+                    return value === 'true';
+                }
+                if (!isNaN(value) && value !== '') {
+                    return Number(value);
+                }
+                return value;
+            }
+
+            async function saveProperty(rowId) {
+                console.log('=== saveProperty called ===');
+                console.log('Row ID:', rowId);
+                
+                const data = spreadsheetData[rowId];
+                console.log('Row data:', data);
+                
+                if (!data || !data.associatedProperty) {
+                    console.log('No associated property found');
+                    showToast('Please select a template property first', 'error');
+                    return;
+                }
+                
+                if (!data.value || data.value.trim() === '') {
+                    console.log('No value to save');
+                    showToast('Please enter a value to save', 'error');
+                    return;
+                }
+                
+                try {
+                    const property = data.associatedProperty;
+                    const value = parseValue(data.value);
+                    
+                    console.log('Property to save:', property);
+                    console.log('Value to save:', value, 'Type:', typeof value);
+                    
+                    let endpoint, payload;
+                    
+                    if (property.blockId) {
+                        // Save to block property
+                        endpoint = '/api/update_property';
+                        payload = {
+                            block_id: property.blockId,
+                            property_name: property.name,
+                            new_value: value
+                        };
+                        console.log('Saving to block property:', payload);
+                    } else {
+                        // Save to root property
+                        endpoint = '/api/update_root_property';
+                        payload = {
+                            property_name: property.name,
+                            new_value: value
+                        };
+                        console.log('Saving to root property:', payload);
+                    }
+                    
+                    console.log('Making request to:', endpoint);
+                    console.log('Payload:', JSON.stringify(payload));
+                    
+                    const response = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    console.log('Response status:', response.status);
+                    console.log('Response ok:', response.ok);
+                    
+                    const result = await response.json();
+                    console.log('Response result:', result);
+                    
+                    if (result.success) {
+                        // Update the last applied value to prevent auto-trigger
+                        data.lastAppliedValue = data.value;
+                        
+                        // Refresh blocks to get updated values
+                        try {
+                            console.log('Refreshing blocks to get updated values...');
+                            const blocksResponse = await fetch('/api/blocks');
+                            const blocksResult = await blocksResponse.json();
+                            
+                            if (blocksResult && typeof blocksResult === 'object') {
+                                // Find the updated value in the refreshed data
+                                let updatedValue = null;
+                                let foundInBlock = false;
+                                
+                                if (property.blockId) {
+                                    // Look for the block property
+                                    for (const blockType in blocksResult) {
+                                        const blocks = blocksResult[blockType];
+                                        for (const block of blocks) {
+                                            if (block.id === property.blockId && block.data && block.data[property.name] !== undefined) {
+                                                updatedValue = block.data[property.name];
+                                                foundInBlock = true;
+                                                break;
+                                            }
+                                        }
+                                        if (foundInBlock) break;
+                                    }
+                                } else {
+                                    // Look for root property (this might need adjustment based on actual data structure)
+                                    // For now, we'll use the result from the save operation
+                                    updatedValue = result.updated_value;
+                                }
+                                
+                                const valueDisplay = updatedValue !== null ? ` (now: ${updatedValue})` : '';
+                                showToast(`Successfully saved ${data.name} to ${property.displayName}${valueDisplay}`, 'success');
+                            } else {
+                                showToast(`Successfully saved ${data.name} to ${property.displayName}`, 'success');
+                            }
+                        } catch (refreshError) {
+                            console.error('Error refreshing blocks:', refreshError);
+                            showToast(`Successfully saved ${data.name} to ${property.displayName}`, 'success');
+                        }
+                    } else {
+                        console.error('Save failed:', result.error);
+                        showToast(`Failed to save: ${result.error}`, 'error');
+                    }
+                } catch (error) {
+                    console.error('Error saving property:', error);
+                    console.error('Error details:', {
+                        message: error.message,
+                        stack: error.stack
+                    });
+                    showToast(`Error saving property: ${error.message}`, 'error');
                 }
             }
         </script>

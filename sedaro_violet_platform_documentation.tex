@@ -1,0 +1,635 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+% Page setup
+\geometry{margin=1in}
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{Sedaro Violet Platform}
+\lhead{Technical Documentation}
+\rfoot{\thepage}
+
+% Code listing setup
+\lstset{
+    basicstyle=\ttfamily\footnotesize,
+    breaklines=true,
+    frame=single,
+    numbers=left,
+    numberstyle=\tiny,
+    keywordstyle=\color{blue},
+    commentstyle=\color{green!60!black},
+    stringstyle=\color{red},
+    backgroundcolor=\color{gray!10},
+    showstringspaces=false,
+    tabsize=2
+}
+
+% Title formatting
+\titleformat{\section}{\Large\bfseries}{\thesection}{1em}{}
+\titleformat{\subsection}{\large\bfseries}{\thesubsection}{1em}{}
+
+\begin{document}
+
+\title{\Huge\textbf{Sedaro Violet Platform}\\\large Technical Implementation Documentation}
+\author{Development Team}
+\date{\today}
+\maketitle
+
+\tableofcontents
+\newpage
+
+\section{Executive Summary}
+
+The Sedaro Violet Platform is a Flask-based web application that provides an intuitive interface for managing and simulating agent templates using the Sedaro Python client. The platform features a spreadsheet-like interface for parameter management, real-time simulation monitoring, and comprehensive state persistence.
+
+\section{Architecture Overview}
+
+\subsection{Technology Stack}
+\begin{itemize}
+    \item \textbf{Backend}: Flask (Python web framework)
+    \item \textbf{Frontend}: HTML5, CSS3, JavaScript (Vanilla)
+    \item \textbf{API Client}: Sedaro Python SDK
+    \item \textbf{State Management}: Browser localStorage
+    \item \textbf{Styling}: Custom CSS with Violet Labs branding
+\end{itemize}
+
+\subsection{Core Components}
+\begin{enumerate}
+    \item Agent Template Management
+    \item Interactive Property Editor
+    \item BOM Spreadsheet Interface
+    \item Simulation Control System
+    \item State Persistence Layer
+\end{enumerate}
+
+\section{Key Features Implementation}
+
+\subsection{1. Agent Template Integration}
+
+\textbf{Purpose}: Direct integration with Sedaro agent templates for real-time property management.
+
+\textbf{Code Location}: Lines 17-25, 138-154
+
+\begin{lstlisting}[language=Python, caption=Agent Template Initialization]
+# Define modules
+sedaro = SedaroApiClient(api_key = API_KEY)
+agent_template_branch = sedaro.agent_template(TEMP_AGENT_REPO_BRANCH_ID)
+
+def get_agent_template_structure() -> Dict[str, Any]:
+    """Get the complete structure of the agent template data"""
+    try:
+        agent_data = agent_template_branch.data
+        return {
+            'success': True,
+            'data': agent_data,
+            'keys': list(agent_data.keys()) if isinstance(agent_data, dict) else []
+        }
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e)
+        }
+\end{lstlisting}
+
+\textbf{Key Features}:
+\begin{itemize}
+    \item Direct Sedaro client integration
+    \item Template structure exploration
+    \item Dynamic property discovery
+    \item Real-time template refresh capability
+\end{itemize}
+
+\subsection{2. Interactive Property Editor}
+
+\textbf{Purpose}: Visual interface for editing block and root-level properties with mutability detection.
+
+\textbf{Code Location}: Lines 155-219, 250-292
+
+\begin{lstlisting}[language=Python, caption=Property Update Functions]
+def update_block_property(block_id: str, property_name: str, new_value: Any) -> Dict[str, Any]:
+    """Update a specific property of a block using Sedaro client directly"""
+    try:
+        block = agent_template_branch.block(block_id)
+        block.update(**{property_name: new_value})
+        updated_value = getattr(block, property_name, new_value)
+        
+        return {
+            'success': True,
+            'message': f'Successfully updated {property_name} to {updated_value}',
+            'updated_value': updated_value
+        }
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+def get_property_mutability(block_id: Optional[str] = None, property_name: Optional[str] = None) -> Dict[str, Any]:
+    """Check if a property is mutable by attempting to get its metadata"""
+    try:
+        if block_id:
+            block = agent_template_branch.block(block_id)
+            block_data = block.data
+            
+            if property_name not in block_data:
+                return {
+                    'success': False,
+                    'error': f'Property {property_name} not found in block {block_id}'
+                }
+            
+            immutable_properties = ['id', 'type', '_id', '_type', '_version', '_created', '_updated']
+            is_mutable = property_name not in immutable_properties
+            
+            return {
+                'success': True,
+                'mutable': is_mutable,
+                'reason': 'Immutable system property' if not is_mutable else 'Editable property'
+            }
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e)
+        }
+\end{lstlisting}
+
+\textbf{Key Features}:
+\begin{itemize}
+    \item Direct Sedaro client property updates
+    \item Mutability detection for UI feedback
+    \item Type conversion handling
+    \item Comprehensive error handling
+\end{itemize}
+
+\subsection{3. BOM Spreadsheet Interface}
+
+\textbf{Purpose}: Spreadsheet-like interface for managing input variables and associating them with template properties.
+
+\textbf{Code Location}: Lines 2074-2150, 2400-2500
+
+\begin{lstlisting}[language=JavaScript, caption=Spreadsheet Row Management]
+function addSpreadsheetRow(restoreRowId = null, restoreData = null) {
+    const tbody = document.getElementById('bomTableBody');
+    const rowId = restoreRowId || Math.floor(Math.random() * 1000000);
+    
+    const row = document.createElement('tr');
+    row.id = `row-${rowId}`;
+    row.innerHTML = `
+        <td>
+            <input type="text" class="spreadsheet-input" placeholder="Variable name" 
+                   onchange="updateSpreadsheetData('${rowId}', 'name', this.value)">
+        </td>
+        <td>
+            <input type="text" class="spreadsheet-input" placeholder="Input value" 
+                   onchange="updateSpreadsheetData('${rowId}', 'value', this.value)">
+        </td>
+        <td>
+            <div class="property-selector">
+                <input type="text" placeholder="Click to select template property" readonly
+                       onclick="showPropertyDropdown('${rowId}')">
+                <div class="property-dropdown" id="dropdown-${rowId}"></div>
+            </div>
+        </td>
+        <td>
+            <div class="action-buttons">
+                <button class="action-btn save" onclick="saveProperty('${rowId}')">
+                    💾 Save
+                </button>
+                <button class="action-btn delete" onclick="deleteRow('${rowId}')">
+                    🗑️
+                </button>
+            </div>
+        </td>
+    `;
+    
+    tbody.appendChild(row);
+    
+    if (restoreData) {
+        spreadsheetData[rowId] = restoreData;
+        // Restore input values
+        const nameInput = row.querySelector('td:nth-child(1) input');
+        const valueInput = row.querySelector('td:nth-child(2) input');
+        const propertyInput = row.querySelector('td:nth-child(3) input');
+        
+        if (nameInput && restoreData.name) nameInput.value = restoreData.name;
+        if (valueInput && restoreData.value) valueInput.value = restoreData.value;
+        if (propertyInput && restoreData.associatedProperty) {
+            propertyInput.value = restoreData.associatedProperty.displayName;
+        }
+    } else {
+        spreadsheetData[rowId] = {
+            name: '',
+            value: '',
+            associatedProperty: null,
+            lastAppliedValue: null
+        };
+    }
+}
+\end{lstlisting}
+
+\textbf{Key Features}:
+\begin{itemize}
+    \item Dynamic row addition/deletion
+    \item Property association via dropdown
+    \item Auto-trigger simulation capability
+    \item State restoration support
+\end{itemize}
+
+\subsection{4. Auto-Trigger Simulation System}
+
+\textbf{Purpose}: Automatically trigger simulations when variables change, with comprehensive error handling.
+
+\textbf{Code Location}: Lines 2400-2500
+
+\begin{lstlisting}[language=JavaScript, caption=Auto-Trigger Logic]
+async function applySpreadsheetChanges() {
+    const autoSimEnabled = document.getElementById('autoSimToggle').checked;
+    if (!autoSimEnabled) return;
+    
+    let hasChanges = false;
+    let hasErrors = false;
+    
+    for (const [rowId, data] of Object.entries(spreadsheetData)) {
+        if (data.name && data.value && data.associatedProperty) {
+            const currentValue = parseValue(data.value);
+            const lastValue = data.lastAppliedValue;
+            
+            // Check if value has actually changed locally
+            if (JSON.stringify(currentValue) !== JSON.stringify(lastValue)) {
+                try {
+                    let updateResponse;
+                    
+                    if (data.associatedProperty.blockId) {
+                        // Update block property
+                        updateResponse = await fetch('/api/update_property', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                block_id: data.associatedProperty.blockId,
+                                property_name: data.associatedProperty.name,
+                                new_value: currentValue
+                            })
+                        });
+                    } else {
+                        // Update root property
+                        updateResponse = await fetch('/api/update_root_property', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                property_name: data.associatedProperty.name,
+                                new_value: currentValue
+                            })
+                        });
+                    }
+                    
+                    const updateResult = await updateResponse.json();
+                    
+                    if (updateResult.success) {
+                        const actualChanged = updateResult.updated_value !== data.lastAppliedValue;
+                        
+                        if (actualChanged) {
+                            hasChanges = true;
+                            showToast(`Updated ${data.name} to ${data.value}`, 'success');
+                        } else {
+                            showToast(`No change needed for ${data.name}`, 'info');
+                        }
+                        
+                        spreadsheetData[rowId].lastAppliedValue = updateResult.updated_value;
+                    } else {
+                        hasErrors = true;
+                        showToast(`Failed to update ${data.name}: ${updateResult.error}`, 'error');
+                    }
+                } catch (error) {
+                    hasErrors = true;
+                    showToast(`Failed to update ${data.name}: ${error.message}`, 'error');
+                }
+            }
+        }
+    }
+    
+    // Only trigger simulation if we actually had changes AND no errors occurred
+    if (hasChanges && !hasErrors) {
+        setTimeout(() => {
+            startSimulation();
+        }, 1000);
+    } else if (hasErrors) {
+        showToast('Simulation skipped due to update errors', 'error');
+    }
+}
+\end{lstlisting}
+
+\textbf{Key Features}:
+\begin{itemize}
+    \item Change detection and validation
+    \item Comprehensive error handling
+    \item Conditional simulation triggering
+    \item User feedback through toast notifications
+\end{itemize}
+
+\subsection{5. Real-Time Simulation Monitoring}
+
+\textbf{Purpose}: Non-blocking simulation progress monitoring with automatic polling and timeout protection.
+
+\textbf{Code Location}: Lines 1325-1400
+
+\begin{lstlisting}[language=JavaScript, caption=Progress Monitoring System]
+function startProgressMonitoring(simulationId) {
+    // Clear any existing interval
+    if (progressInterval) {
+        clearInterval(progressInterval);
+    }
+    
+    // Update immediately
+    updateProgress(simulationId);
+    
+    // Then update every 2 seconds
+    progressInterval = setInterval(async () => {
+        const isComplete = await updateProgress(simulationId);
+        if (isComplete) {
+            clearInterval(progressInterval);
+            progressInterval = null;
+        }
+    }, 2000);
+    
+    // Safety timeout: stop polling after 30 minutes
+    setTimeout(() => {
+        if (progressInterval) {
+            console.warn('Stopping simulation monitoring due to timeout (30 minutes)');
+            clearInterval(progressInterval);
+            progressInterval = null;
+            showToast('Simulation monitoring stopped due to timeout', 'info');
+            
+            const statusText = document.getElementById('statusText');
+            if (statusText) {
+                statusText.textContent = '⏰ Simulation monitoring timed out after 30 minutes';
+            }
+        }
+    }, 30 * 60 * 1000); // 30 minutes
+}
+
+async function updateProgress(simulationId) {
+    try {
+        const response = await fetch(`/api/simulation_status?simulation_id=${simulationId}`);
+        const result = await response.json();
+        
+        if (result.success) {
+            const progressFill = document.getElementById('progressFill');
+            const progressText = document.getElementById('progressText');
+            const statusText = document.getElementById('statusText');
+            
+            // Update progress bar
+            const progress = result.progress || 0;
+            progressFill.style.width = `${progress}%`;
+            progressText.textContent = `${Math.round(progress)}%`;
+            
+            // Update status text
+            statusText.textContent = result.message;
+            
+            // Check if simulation is complete
+            if (result.is_complete) {
+                if (result.status === 'SUCCEEDED') {
+                    statusText.textContent = '✅ Simulation completed successfully!';
+                    showToast('Simulation completed successfully!', 'success');
+                } else {
+                    statusText.textContent = `❌ Simulation ${result.status.toLowerCase()}`;
+                    showToast(`Simulation ${result.status.toLowerCase()}`, 'error');
+                }
+                
+                // Hide progress bar and abort button, but keep status message
+                const progressBar = document.querySelector('.progress-container');
+                const abortBtn = document.getElementById('abortBtn');
+                if (progressBar) progressBar.style.display = 'none';
+                if (abortBtn) abortBtn.style.display = 'none';
+                
+                // Reset simulation ID to allow new simulations
+                currentSimulationId = null;
+                
+                return true; // Stop polling
+            }
+            
+            return false; // Continue polling
+        } else {
+            console.error('Failed to get simulation status:', result.error);
+            showToast('Failed to get simulation status, stopping monitoring', 'error');
+            return true; // Stop polling
+        }
+    } catch (error) {
+        console.error('Error checking simulation status:', error);
+        showToast('Error checking simulation status, stopping monitoring', 'error');
+        return true; // Stop polling
+    }
+}
+\end{lstlisting}
+
+\textbf{Key Features}:
+\begin{itemize}
+    \item Non-blocking progress updates
+    \item Automatic polling with 2-second intervals
+    \item 30-minute safety timeout
+    \item Comprehensive error handling
+    \item UI state management
+\end{itemize}
+
+\subsection{6. State Persistence System}
+
+\textbf{Purpose}: Prevent data loss on page refresh by saving and restoring application state.
+
+\textbf{Code Location}: Lines 1170-1250
+
+\begin{lstlisting}[language=JavaScript, caption=State Persistence Implementation]
+function saveState() {
+    const state = {
+        currentSimulationId: currentSimulationId,
+        spreadsheetData: spreadsheetData,
+        autoSimEnabled: document.getElementById('autoSimToggle')?.checked || false
+    };
+    localStorage.setItem('sedaroVioletState', JSON.stringify(state));
+}
+
+function loadState() {
+    try {
+        const savedState = localStorage.getItem('sedaroVioletState');
+        if (savedState) {
+            const state = JSON.parse(savedState);
+            
+            // Restore simulation ID
+            if (state.currentSimulationId) {
+                currentSimulationId = state.currentSimulationId;
+                // Check if simulation is still running
+                checkAndRestoreSimulation(state.currentSimulationId);
+            }
+            
+            // Restore spreadsheet data
+            if (state.spreadsheetData) {
+                spreadsheetData = state.spreadsheetData;
+                restoreSpreadsheetUI();
+            }
+            
+            // Restore auto-sim toggle
+            if (state.autoSimEnabled !== undefined) {
+                const autoSimToggle = document.getElementById('autoSimToggle');
+                if (autoSimToggle) {
+                    autoSimToggle.checked = state.autoSimEnabled;
+                }
+            }
+            
+            console.log('State restored from localStorage');
+        }
+    } catch (error) {
+        console.error('Error loading state:', error);
+        // Clear corrupted state
+        localStorage.removeItem('sedaroVioletState');
+    }
+}
+
+async function checkAndRestoreSimulation(simulationId) {
+    try {
+        const response = await fetch(`/api/simulation_status?simulation_id=${simulationId}`);
+        const result = await response.json();
+        
+        if (result.success && !result.is_complete) {
+            // Simulation is still running, restore progress monitoring
+            const progressDiv = document.getElementById('simulationProgress');
+            if (progressDiv) {
+                progressDiv.style.display = 'block';
+            }
+            startProgressMonitoring(simulationId);
+            showToast('Restored simulation monitoring', 'info');
+        } else {
+            // Simulation is complete or doesn't exist, clear the ID
+            currentSimulationId = null;
+            saveState();
+        }
+    } catch (error) {
+        console.error('Error checking simulation status:', error);
+        currentSimulationId = null;
+        saveState();
+    }
+}
+
+function setupStatePersistence() {
+    // Save state every 5 seconds
+    setInterval(saveState, 5000);
+    
+    // Save state on page unload
+    window.addEventListener('beforeunload', saveState);
+    
+    // Save state when spreadsheet data changes
+    const originalUpdateSpreadsheetData = updateSpreadsheetData;
+    updateSpreadsheetData = function(rowId, field, value) {
+        originalUpdateSpreadsheetData(rowId, field, value);
+        saveState();
+    };
+}
+\end{lstlisting}
+
+\textbf{Key Features}:
+\begin{itemize}
+    \item Automatic state saving every 5 seconds
+    \item State restoration on page load
+    \item Simulation state recovery
+    \item Spreadsheet data persistence
+    \item Error handling for corrupted state
+\end{itemize}
+
+\section{API Endpoints}
+
+\subsection{Core Endpoints}
+
+\begin{enumerate}
+    \item \texttt{/api/blocks} - Get all blocks and properties
+    \item \texttt{/api/update\_property} - Update block properties
+    \item \texttt{/api/update\_root\_property} - Update root-level properties
+    \item \texttt{/api/simulate} - Start simulation
+    \item \texttt{/api/simulation\_status} - Get simulation progress
+    \item \texttt{/api/abort\_simulation} - Abort running simulation
+    \item \texttt{/api/template\_structure} - Get template structure
+    \item \texttt{/api/refresh\_template} - Refresh template connection
+\end{enumerate}
+
+\section{User Interface Features}
+
+\subsection{Visual Design}
+\begin{itemize}
+    \item \textbf{Branding}: Violet Labs color scheme (\#c3adff primary)
+    \item \textbf{Responsive Layout}: Mobile-friendly design
+    \item \textbf{Toast Notifications}: Real-time user feedback
+    \item \textbf{Progress Indicators}: Visual simulation progress
+    \item \textbf{Interactive Elements}: Hover effects and transitions
+\end{itemize}
+
+\subsection{User Experience}
+\begin{itemize}
+    \item \textbf{Intuitive Workflow}: Step-by-step parameter management
+    \item \textbf{Error Prevention}: Validation and confirmation dialogs
+    \item \textbf{State Recovery}: Seamless refresh experience
+    \item \textbf{Real-time Updates}: Live progress monitoring
+\end{itemize}
+
+\section{Error Handling Strategy}
+
+\subsection{Comprehensive Error Management}
+\begin{enumerate}
+    \item \textbf{API Error Handling}: Graceful degradation for network issues
+    \item \textbf{Validation Errors}: User-friendly error messages
+    \item \textbf{State Corruption}: Automatic recovery mechanisms
+    \item \textbf{Simulation Failures}: Detailed error reporting
+\end{enumerate}
+
+\section{Performance Optimizations}
+
+\subsection{Efficiency Measures}
+\begin{itemize}
+    \item \textbf{Lazy Loading}: Template properties loaded on demand
+    \item \textbf{Debounced Updates}: Reduced API calls during rapid changes
+    \item \textbf{Memory Management}: Proper cleanup of intervals and event listeners
+    \item \textbf{Caching}: Local storage for state persistence
+\end{itemize}
+
+\section{Development Best Practices}
+
+\subsection{Code Quality}
+\begin{itemize}
+    \item \textbf{Modular Design}: Separated concerns and reusable components
+    \item \textbf{Error Boundaries}: Comprehensive try-catch blocks
+    \item \textbf{Documentation}: Inline comments and function documentation
+    \item \textbf{Type Safety}: Proper data type handling
+\end{itemize}
+
+\section{Future Enhancements}
+
+\subsection{Planned Features}
+\begin{enumerate}
+    \item \textbf{Batch Operations}: Multi-property updates
+    \item \textbf{Template Versioning}: Historical data tracking
+    \item \textbf{Advanced Analytics}: Simulation result analysis
+    \item \textbf{User Authentication}: Multi-user support
+    \item \textbf{API Rate Limiting}: Enhanced performance monitoring
+\end{enumerate}
+
+\section{Conclusion}
+
+The Sedaro Violet Platform represents a comprehensive solution for agent template management and simulation control. The implementation demonstrates modern web development practices with a focus on user experience, reliability, and maintainability.
+
+Key achievements include:
+\begin{itemize}
+    \item Seamless Sedaro API integration
+    \item Intuitive spreadsheet interface
+    \item Robust state persistence
+    \item Real-time simulation monitoring
+    \item Comprehensive error handling
+\end{itemize}
+
+The platform successfully bridges the gap between complex simulation parameters and user-friendly interface design, enabling efficient workflow management for Sedaro agent templates.
+
+\end{document} 
