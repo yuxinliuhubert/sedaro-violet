@@ -429,6 +429,235 @@ def get_simulation_results(simulation_id: Optional[str] = None) -> Dict[str, Any
             'error': str(e)
         }
 
+def get_simulation_statistics(simulation_id: Optional[str] = None, wait: bool = True, streams: Optional[List] = None) -> Dict[str, Any]:
+    """
+    Get simulation statistics using Sedaro client directly
+    """
+    try:
+        scenario_branch = sedaro.scenario(SCENARIO_BRANCH_VERSION_ID)
+        sim = scenario_branch.simulation
+        
+        if simulation_id:
+            # Get specific simulation
+            simulation_handle = sim.status(job_id=simulation_id)
+        else:
+            # Get latest simulation
+            simulation_handle = sim.status()
+        
+        # Get statistics with optional wait and streams parameters
+        if streams:
+            stats = sim.stats(wait=wait, streams=streams)
+        else:
+            stats = sim.stats(wait=wait)
+        
+        return {
+            'success': True,
+            'simulation_id': simulation_handle.get('id'),
+            'simulation_status': simulation_handle.status()['status'],
+            'statistics': stats
+        }
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+def get_available_streams() -> Dict[str, Any]:
+    """
+    Get available streams for statistics based on actual scenario branch structure
+    """
+    try:
+        scenario_branch = sedaro.scenario(SCENARIO_BRANCH_VERSION_ID)
+        available_streams = []
+        
+        # Get TemplatedAgent streams
+        try:
+            templated_agents = scenario_branch.TemplatedAgent.get_all()
+            for agent in templated_agents:
+                agent_id = agent.id
+                agent_name = agent.name
+                
+                # Add agent-level streams
+                available_streams.extend([
+                    {
+                        'name': f'{agent_name}_position',
+                        'path': (agent_id, 'position'),
+                        'display_name': f'{agent_name} - Position',
+                        'agent_id': agent_id,
+                        'agent_type': 'TemplatedAgent'
+                    },
+                    {
+                        'name': f'{agent_name}_velocity',
+                        'path': (agent_id, 'velocity'),
+                        'display_name': f'{agent_name} - Velocity',
+                        'agent_id': agent_id,
+                        'agent_type': 'TemplatedAgent'
+                    },
+                    {
+                        'name': f'{agent_name}_attitude',
+                        'path': (agent_id, 'attitude'),
+                        'display_name': f'{agent_name} - Attitude',
+                        'agent_id': agent_id,
+                        'agent_type': 'TemplatedAgent'
+                    },
+                    {
+                        'name': f'{agent_name}_angular_velocity',
+                        'path': (agent_id, 'angularVelocity'),
+                        'display_name': f'{agent_name} - Angular Velocity',
+                        'agent_id': agent_id,
+                        'agent_type': 'TemplatedAgent'
+                    }
+                ])
+                
+                # Add coordinate system specific streams
+                if hasattr(agent, 'position') and agent.position:
+                    for coord_sys in agent.position.keys():
+                        available_streams.extend([
+                            {
+                                'name': f'{agent_name}_position_{coord_sys}',
+                                'path': (agent_id, 'position', coord_sys),
+                                'display_name': f'{agent_name} - Position ({coord_sys.upper()})',
+                                'agent_id': agent_id,
+                                'agent_type': 'TemplatedAgent',
+                                'coordinate_system': coord_sys
+                            }
+                        ])
+                
+                if hasattr(agent, 'velocity') and agent.velocity:
+                    for coord_sys in agent.velocity.keys():
+                        available_streams.extend([
+                            {
+                                'name': f'{agent_name}_velocity_{coord_sys}',
+                                'path': (agent_id, 'velocity', coord_sys),
+                                'display_name': f'{agent_name} - Velocity ({coord_sys.upper()})',
+                                'agent_id': agent_id,
+                                'agent_type': 'TemplatedAgent',
+                                'coordinate_system': coord_sys
+                            }
+                        ])
+                        
+        except Exception as e:
+            print(f"Error getting TemplatedAgent streams: {e}")
+        
+        # Get PeripheralAgent streams (includes all peripheral types)
+        try:
+            peripheral_agents = scenario_branch.PeripheralAgent.get_all()
+            for agent in peripheral_agents:
+                agent_id = agent.id
+                agent_name = agent.name
+                agent_type = agent.type
+                
+                # Add agent-level streams
+                available_streams.extend([
+                    {
+                        'name': f'{agent_name}_position',
+                        'path': (agent_id, 'position'),
+                        'display_name': f'{agent_name} - Position ({agent_type})',
+                        'agent_id': agent_id,
+                        'agent_type': agent_type
+                    },
+                    {
+                        'name': f'{agent_name}_velocity',
+                        'path': (agent_id, 'velocity'),
+                        'display_name': f'{agent_name} - Velocity ({agent_type})',
+                        'agent_id': agent_id,
+                        'agent_type': agent_type
+                    },
+                    {
+                        'name': f'{agent_name}_attitude',
+                        'path': (agent_id, 'attitude'),
+                        'display_name': f'{agent_name} - Attitude ({agent_type})',
+                        'agent_id': agent_id,
+                        'agent_type': agent_type
+                    },
+                    {
+                        'name': f'{agent_name}_angular_velocity',
+                        'path': (agent_id, 'angularVelocity'),
+                        'display_name': f'{agent_name} - Angular Velocity ({agent_type})',
+                        'agent_id': agent_id,
+                        'agent_type': agent_type
+                    }
+                ])
+                
+                # Add coordinate system specific streams
+                if hasattr(agent, 'position') and agent.position:
+                    for coord_sys in agent.position.keys():
+                        available_streams.extend([
+                            {
+                                'name': f'{agent_name}_position_{coord_sys}',
+                                'path': (agent_id, 'position', coord_sys),
+                                'display_name': f'{agent_name} - Position ({coord_sys.upper()})',
+                                'agent_id': agent_id,
+                                'agent_type': agent_type,
+                                'coordinate_system': coord_sys
+                            }
+                        ])
+                
+                if hasattr(agent, 'velocity') and agent.velocity:
+                    for coord_sys in agent.velocity.keys():
+                        available_streams.extend([
+                            {
+                                'name': f'{agent_name}_velocity_{coord_sys}',
+                                'path': (agent_id, 'velocity', coord_sys),
+                                'display_name': f'{agent_name} - Velocity ({coord_sys.upper()})',
+                                'agent_id': agent_id,
+                                'agent_type': agent_type,
+                                'coordinate_system': coord_sys
+                            }
+                        ])
+                
+                # Add agent-specific properties
+                if hasattr(agent, 'body') and agent.body:
+                    available_streams.append({
+                        'name': f'{agent_name}_body',
+                        'path': (agent_id, 'body'),
+                        'display_name': f'{agent_name} - Body ({agent_type})',
+                        'agent_id': agent_id,
+                        'agent_type': agent_type
+                    })
+                
+                if hasattr(agent, 'timeStepConstraints') and agent.timeStepConstraints:
+                    available_streams.append({
+                        'name': f'{agent_name}_time_step_constraints',
+                        'path': (agent_id, 'timeStepConstraints'),
+                        'display_name': f'{agent_name} - Time Step Constraints ({agent_type})',
+                        'agent_id': agent_id,
+                        'agent_type': agent_type
+                    })
+                        
+        except Exception as e:
+            print(f"Error getting PeripheralAgent streams: {e}")
+        
+        # Add template-specific streams if we have access to the agent template
+        try:
+            # Get streams from the agent template
+            template_streams = [
+                {'name': 'template_power', 'path': ('power',), 'display_name': 'Power System'},
+                {'name': 'template_thermal', 'path': ('thermal',), 'display_name': 'Thermal System'},
+                {'name': 'template_battery', 'path': ('battery',), 'display_name': 'Battery System'},
+                {'name': 'template_thruster', 'path': ('thruster',), 'display_name': 'Thruster System'},
+                {'name': 'template_sensor', 'path': ('sensor',), 'display_name': 'Sensor System'},
+                {'name': 'template_communication', 'path': ('communication',), 'display_name': 'Communication System'},
+                {'name': 'template_gnc', 'path': ('gnc',), 'display_name': 'Guidance, Navigation & Control'},
+                {'name': 'template_cdh', 'path': ('cdh',), 'display_name': 'Command & Data Handling'}
+            ]
+            available_streams.extend(template_streams)
+            
+        except Exception as e:
+            print(f"Error getting template streams: {e}")
+        
+        return {
+            'success': True,
+            'streams': available_streams,
+            'note': f'Found {len(available_streams)} streams from scenario branch'
+        }
+            
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
 @app.route("/")
 def index():
     """Main page with block discovery and property editing interface"""
@@ -1221,6 +1450,273 @@ def index():
                 margin-right: 0.5rem;
                 font-size: 1.2em;
             }
+            
+            /* Simulation Statistics Styles */
+            .simulation-statistics {
+                margin-top: 3rem;
+                padding: 2rem;
+                border: 2px solid #e9ecef;
+                border-radius: 8px;
+                background: #f8f9fa;
+            }
+            
+            .simulation-statistics h2 {
+                color: #495057;
+                margin-bottom: 1rem;
+            }
+            
+            .statistics-controls {
+                display: flex;
+                align-items: center;
+                gap: 1rem;
+                margin-bottom: 2rem;
+                flex-wrap: wrap;
+                padding: 1rem;
+                background: white;
+                border-radius: 6px;
+                border: 1px solid #dee2e6;
+            }
+            
+            .control-group {
+                display: flex;
+                flex-direction: column;
+                gap: 0.5rem;
+                min-width: 200px;
+            }
+            
+            .control-group label {
+                font-weight: bold;
+                color: #495057;
+                font-size: 0.9rem;
+            }
+            
+            .control-group input[type="text"] {
+                padding: 0.5rem;
+                border: 1px solid #dee2e6;
+                border-radius: 4px;
+                font-size: 0.9rem;
+            }
+            
+            .stream-selector {
+                background: white;
+                padding: 1.5rem;
+                border-radius: 6px;
+                border: 1px solid #dee2e6;
+                margin-bottom: 2rem;
+            }
+            
+            .stream-selector h3 {
+                color: #495057;
+                margin-bottom: 1rem;
+                font-size: 1.1em;
+            }
+            
+            .stream-controls {
+                display: flex;
+                align-items: center;
+                gap: 1rem;
+                margin-bottom: 1rem;
+                flex-wrap: wrap;
+            }
+            
+            .stream-list {
+                max-height: 300px;
+                overflow-y: auto;
+                border: 1px solid #dee2e6;
+                border-radius: 4px;
+                background: #f8f9fa;
+                padding: 1rem;
+            }
+            
+            .stream-item {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                padding: 0.5rem;
+                border-bottom: 1px solid #e9ecef;
+                cursor: pointer;
+                transition: background 0.2s;
+            }
+            
+            .stream-item:hover {
+                background: #e9ecef;
+            }
+            
+            .stream-item:last-child {
+                border-bottom: none;
+            }
+            
+            .stream-item input[type="checkbox"] {
+                margin: 0;
+            }
+            
+            .stream-item .stream-name {
+                flex: 1;
+                font-weight: 500;
+                color: #495057;
+            }
+            
+            .stream-item .stream-path {
+                font-size: 0.8rem;
+                color: #6c757d;
+                font-family: monospace;
+            }
+            
+            .statistics-results {
+                background: white;
+                padding: 1.5rem;
+                border-radius: 6px;
+                border: 1px solid #dee2e6;
+                min-height: 200px;
+            }
+            
+            .statistics-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 1rem;
+            }
+            
+            .statistics-table th {
+                background: #c3adff;
+                color: white;
+                padding: 12px 8px;
+                text-align: left;
+                font-weight: bold;
+                border-bottom: 2px solid #a78bfa;
+            }
+            
+            .statistics-table td {
+                padding: 8px;
+                border-bottom: 1px solid #e9ecef;
+                vertical-align: middle;
+            }
+            
+            .statistics-table tr:hover {
+                background: #f8f9fa;
+            }
+            
+            .statistic-value {
+                font-family: monospace;
+                font-weight: 500;
+            }
+            
+            .statistic-value.number {
+                color: #28a745;
+            }
+            
+            .statistic-value.string {
+                color: #6c757d;
+            }
+            
+            .statistic-value.boolean {
+                color: #007bff;
+            }
+            
+            .statistic-value.array {
+                color: #fd7e14;
+            }
+            
+            .statistic-value.object {
+                color: #6f42c1;
+            }
+            
+            .no-statistics {
+                text-align: center;
+                padding: 3rem;
+                color: #6c757d;
+                font-style: italic;
+            }
+            
+            .statistics-loading {
+                text-align: center;
+                padding: 2rem;
+                color: #6c757d;
+            }
+            
+            .statistics-error {
+                background: #f8d7da;
+                color: #721c24;
+                padding: 1rem;
+                border-radius: 4px;
+                border: 1px solid #f5c6cb;
+                margin: 1rem 0;
+            }
+            
+            .statistics-success {
+                background: #d4edda;
+                color: #155724;
+                padding: 1rem;
+                border-radius: 4px;
+                border: 1px solid #c3e6cb;
+                margin: 1rem 0;
+            }
+            
+            .stream-filter-highlight {
+                background: #fff3cd;
+                border: 1px solid #ffeaa7;
+            }
+            
+            .agent-statistics-section {
+                background: white;
+                padding: 1.5rem;
+                border-radius: 8px;
+                border: 1px solid #dee2e6;
+                margin-bottom: 1.5rem;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            
+            .agent-statistics-section h3 {
+                color: #495057;
+                margin-bottom: 1rem;
+                font-size: 1.2em;
+                border-bottom: 2px solid #c3adff;
+                padding-bottom: 0.5rem;
+            }
+            
+
+            
+            .badge {
+                padding: 0.25rem 0.5rem;
+                border-radius: 12px;
+                font-size: 0.75rem;
+                font-weight: bold;
+                text-transform: uppercase;
+            }
+            
+            .badge-number {
+                background: #d4edda;
+                color: #155724;
+            }
+            
+            .badge-string {
+                background: #e2e3e5;
+                color: #383d41;
+            }
+            
+            .badge-boolean {
+                background: #cce5ff;
+                color: #004085;
+            }
+            
+            .badge-array {
+                background: #fff3cd;
+                color: #856404;
+            }
+            
+            .badge-object {
+                background: #f8d7da;
+                color: #721c24;
+            }
+            
+            .badge-null {
+                background: #6c757d;
+                color: white;
+            }
+            
+            .badge-unknown {
+                background: #6c757d;
+                color: white;
+            }
         </style>
     </head>
     <body>
@@ -1242,6 +1738,9 @@ def index():
                 </button>
                 <button id="resultsBtn" class="save-button" onclick="getSimulationResults()" style="background: #6f42c1;">
                     📊 Get Results
+                </button>
+                <button id="statsBtn" class="save-button" onclick="toggleStatisticsSection()" style="background: #20c997;">
+                    📈 Statistics
                 </button>
                 <button id="refreshBtn" class="save-button" onclick="loadBlocks()" style="background: #6c757d;">
                     🔄 Refresh Blocks
@@ -1354,6 +1853,39 @@ def index():
                     <div class="empty-state">
                         <p>No properties are currently being tracked.</p>
                         <p>Add variables in the spreadsheet above to start tracking properties.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Simulation Statistics Section -->
+            <div class="simulation-statistics" style="display: none;">
+                <h2>📊 Simulation Statistics</h2>
+                <p>View detailed statistics for completed simulations:</p>
+                
+                <div class="statistics-controls">
+                    <div class="control-group">
+                        <label for="statsSimulationId">Simulation ID:</label>
+                        <input type="text" id="statsSimulationId" placeholder="Enter simulation ID or leave empty for latest">
+                    </div>
+                    <div class="control-group">
+                        <label for="statsWaitToggle">Wait for Stats:</label>
+                        <label class="toggle-container-small">
+                            <input type="checkbox" id="statsWaitToggle" checked>
+                            <span class="toggle-slider-small"></span>
+                        </label>
+                    </div>
+                    <button id="fetchStatsBtn" class="save-button" onclick="fetchSimulationStats()" style="background: #17a2b8;">
+                        📊 Fetch Statistics
+                    </button>
+                    <button id="clearStatsBtn" class="save-button" onclick="clearStatistics()" style="background: #6c757d;">
+                        🗑️ Clear
+                    </button>
+                </div>
+                
+                <div id="statisticsResults" class="statistics-results">
+                    <div class="no-statistics">
+                        <p>Click "Fetch Statistics" to get simulation statistics</p>
+                        <p>Statistics will show summary data like min, max, mean, and standard deviation for simulation variables</p>
                     </div>
                 </div>
             </div>
@@ -3287,6 +3819,367 @@ ${JSON.stringify(result.stats, null, 2)}
                     showToast(`Error saving property: ${error.message}`, 'error');
                 }
             }
+
+            // Statistics Functions
+            function toggleStatisticsSection() {
+                const statsSection = document.querySelector('.simulation-statistics');
+                if (statsSection.style.display === 'none') {
+                    statsSection.style.display = 'block';
+                    loadAvailableStreams();
+                    showToast('Statistics section opened', 'info');
+                } else {
+                    statsSection.style.display = 'none';
+                    showToast('Statistics section closed', 'info');
+                }
+            }
+
+
+
+            async function fetchSimulationStats() {
+                const simulationId = document.getElementById('statsSimulationId').value.trim();
+                const waitForStats = document.getElementById('statsWaitToggle').checked;
+                const resultsDiv = document.getElementById('statisticsResults');
+                const fetchBtn = document.getElementById('fetchStatsBtn');
+                
+                // Show loading state
+                resultsDiv.innerHTML = '<div class="statistics-loading">Fetching statistics...</div>';
+                fetchBtn.disabled = true;
+                
+                try {
+                    const response = await fetch('/api/simulation_statistics', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            simulation_id: simulationId || null,
+                            wait: waitForStats,
+                            streams: null  // Get all available statistics
+                        })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        displayStatistics(result.statistics, result.simulation_id);
+                        showToast('Statistics fetched successfully', 'success');
+                    } else {
+                        resultsDiv.innerHTML = `<div class="statistics-error">❌ Failed to fetch statistics: ${result.error}</div>`;
+                        showToast('Failed to fetch statistics: ' + result.error, 'error');
+                    }
+                } catch (error) {
+                    resultsDiv.innerHTML = `<div class="statistics-error">❌ Error fetching statistics: ${error.message}</div>`;
+                    showToast('Error fetching statistics: ' + error.message, 'error');
+                } finally {
+                    fetchBtn.disabled = false;
+                }
+            }
+
+            function displayStatistics(statistics, simulationId) {
+                const resultsDiv = document.getElementById('statisticsResults');
+                
+                if (!statistics || Object.keys(statistics).length === 0) {
+                    resultsDiv.innerHTML = '<div class="no-statistics">No statistics available for this simulation.</div>';
+                    return;
+                }
+                
+                // First, get agent information to map IDs to names
+                getAgentMapping().then(agentMapping => {
+                    let html = `
+                        <div class="statistics-success">
+                            <h4>✅ Statistics Retrieved Successfully</h4>
+                            <p><strong>Simulation ID:</strong> ${simulationId || 'Latest'}</p>
+                            <p><strong>Total Statistics:</strong> ${Object.keys(statistics).length}</p>
+                        </div>
+                    `;
+                    
+                    // Group statistics by agent
+                    const groupedStats = groupStatisticsByAgent(statistics, agentMapping);
+                    
+                    // Display statistics grouped by agent
+                    Object.keys(groupedStats).forEach(agentName => {
+                        const agentStats = groupedStats[agentName];
+                        
+                        html += `
+                            <div class="agent-statistics-section">
+                                <h3>📊 ${agentName}</h3>
+                                <table class="statistics-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Property</th>
+                                            <th>Value</th>
+                                            <th>Type</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                        `;
+                        
+                        // Process statistics for this agent
+                        agentStats.forEach(stat => {
+                            const valueType = getValueType(stat.value);
+                            const formattedValue = formatValue(stat.value);
+                            
+                            html += `
+                                <tr>
+                                    <td><strong>${stat.property}</strong></td>
+                                    <td class="statistic-value ${valueType}">${formattedValue}</td>
+                                    <td><span class="badge badge-${valueType}">${valueType}</span></td>
+                                </tr>
+                            `;
+                        });
+                        
+                        html += `
+                                    </tbody>
+                                </table>
+                            </div>
+                        `;
+                    });
+                    
+                    resultsDiv.innerHTML = html;
+                }).catch(error => {
+                    // Fallback to original display if agent mapping fails
+                    console.error('Error getting agent mapping:', error);
+                    displayStatisticsFallback(statistics, simulationId);
+                });
+            }
+
+            async function getAgentMapping() {
+                try {
+                    const response = await fetch('/api/available_streams');
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        const agentMapping = {};
+                        result.streams.forEach(stream => {
+                            if (stream.agent_id && stream.display_name) {
+                                // Extract agent name from display name (e.g., "My In-orbit Spacecraft - Position" -> "My In-orbit Spacecraft")
+                                const agentName = stream.display_name.split(' - ')[0];
+                                agentMapping[stream.agent_id] = agentName;
+                            }
+                        });
+                        return agentMapping;
+                    }
+                } catch (error) {
+                    console.error('Error fetching agent mapping:', error);
+                }
+                
+                return {};
+            }
+
+            function groupStatisticsByAgent(statistics, agentMapping) {
+                const groupedStats = {};
+                
+                // Recursively process statistics and group by agent
+                function processStatisticsRecursive(obj, prefix = '') {
+                    for (const [key, value] of Object.entries(obj)) {
+                        const fullKey = prefix ? `${prefix}.${key}` : key;
+                        
+                        if (getValueType(value) === 'object' && value !== null) {
+                            // Continue recursion for nested objects
+                            processStatisticsRecursive(value, fullKey);
+                        } else {
+                            // This is a leaf node (actual statistic value)
+                            const agentId = extractAgentId(fullKey);
+                            const agentName = agentMapping[agentId] || `Unknown Agent (${agentId})`;
+                            const propertyName = extractPropertyName(fullKey);
+                            
+                            if (!groupedStats[agentName]) {
+                                groupedStats[agentName] = [];
+                            }
+                            
+                            groupedStats[agentName].push({
+                                property: propertyName,
+                                value: value,
+                                fullKey: fullKey
+                            });
+                        }
+                    }
+                }
+                
+                processStatisticsRecursive(statistics);
+                return groupedStats;
+            }
+
+            function extractAgentId(key) {
+                // Extract agent ID from statistics key
+                // Examples:
+                // "PRkHzzmM9MMY9JPfBDd7LC/2.PS5ZhpB776TSq4JND74VJm.powerConsumed.absAvg" -> "PRkHzzmM9MMY9JPfBDd7LC"
+                // "PRknkFRHNYJhkCV8b53CLG/0.position.llaDeg.2.absAvg" -> "PRknkFRHNYJhkCV8b53CLG"
+                
+                const parts = key.split('.');
+                if (parts.length > 0) {
+                    // The agent ID is typically the first part before any additional identifiers
+                    const firstPart = parts[0];
+                    // Remove any trailing numbers or additional identifiers
+                    const agentId = firstPart.split('/')[0];
+                    return agentId;
+                }
+                return 'unknown';
+            }
+
+            function extractPropertyName(key) {
+                // Extract a readable property name from the statistics key
+                // Examples:
+                // "PRkHzzmM9MMY9JPfBDd7LC/2.PS5ZhpB776TSq4JND74VJm.powerConsumed.absAvg" -> "Power Consumed - Absolute Average"
+                // "PRknkFRHNYJhkCV8b53CLG/0.position.llaDeg.2.absAvg" -> "Position LLA (Altitude) - Absolute Average"
+                
+                const parts = key.split('.');
+                if (parts.length >= 3) {
+                    // Skip the agent ID and get the meaningful parts
+                    const meaningfulParts = parts.slice(1);
+                    
+                    // Convert to readable format
+                    let propertyName = '';
+                    
+                    // Handle special cases
+                    if (meaningfulParts.includes('powerConsumed')) {
+                        propertyName = 'Power Consumed';
+                    } else if (meaningfulParts.includes('position')) {
+                        propertyName = 'Position';
+                        if (meaningfulParts.includes('llaDeg')) {
+                            propertyName += ' (LLA)';
+                        }
+                    } else if (meaningfulParts.includes('velocity')) {
+                        propertyName = 'Velocity';
+                    } else if (meaningfulParts.includes('attitude')) {
+                        propertyName = 'Attitude';
+                    } else if (meaningfulParts.includes('rainData')) {
+                        propertyName = 'Rain Data';
+                    } else if (meaningfulParts.includes('speed')) {
+                        propertyName = 'Speed';
+                    } else {
+                        // Use the first meaningful part
+                        propertyName = meaningfulParts[0].charAt(0).toUpperCase() + meaningfulParts[0].slice(1);
+                    }
+                    
+                    // Add the statistic type
+                    const statType = meaningfulParts[meaningfulParts.length - 1];
+                    const statTypeName = getStatisticTypeName(statType);
+                    
+                    return `${propertyName} - ${statTypeName}`;
+                }
+                
+                return key;
+            }
+
+            function getStatisticTypeName(statType) {
+                const typeMap = {
+                    'absAvg': 'Absolute Average',
+                    'average': 'Average',
+                    'integral': 'Integral',
+                    'max': 'Maximum',
+                    'min': 'Minimum',
+                    'negativeMax': 'Negative Maximum',
+                    'positiveMax': 'Positive Maximum',
+                    'stdDev': 'Standard Deviation',
+                    'variance': 'Variance'
+                };
+                
+                return typeMap[statType] || statType;
+            }
+
+            function displayStatisticsFallback(statistics, simulationId) {
+                // Fallback to original display method
+                const resultsDiv = document.getElementById('statisticsResults');
+                
+                let html = `
+                    <div class="statistics-success">
+                        <h4>✅ Statistics Retrieved Successfully</h4>
+                        <p><strong>Simulation ID:</strong> ${simulationId || 'Latest'}</p>
+                        <p><strong>Total Statistics:</strong> ${Object.keys(statistics).length}</p>
+                    </div>
+                    <table class="statistics-table">
+                        <thead>
+                            <tr>
+                                <th>Stream/Property</th>
+                                <th>Value</th>
+                                <th>Type</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+                
+                // Recursively process statistics object
+                function processStatistics(obj, prefix = '') {
+                    for (const [key, value] of Object.entries(obj)) {
+                        const fullKey = prefix ? `${prefix}.${key}` : key;
+                        const valueType = getValueType(value);
+                        const formattedValue = formatValue(value);
+                        
+                        html += `
+                            <tr>
+                                <td><strong>${fullKey}</strong></td>
+                                <td class="statistic-value ${valueType}">${formattedValue}</td>
+                                <td><span class="badge badge-${valueType}">${valueType}</span></td>
+                            </tr>
+                        `;
+                        
+                        // Recursively process nested objects
+                        if (valueType === 'object' && value !== null) {
+                            processStatistics(value, fullKey);
+                        }
+                    }
+                }
+                
+                processStatistics(statistics);
+                
+                html += `
+                        </tbody>
+                    </table>
+                `;
+                
+                resultsDiv.innerHTML = html;
+            }
+
+            function getValueType(value) {
+                if (value === null) return 'null';
+                if (Array.isArray(value)) return 'array';
+                if (typeof value === 'object') return 'object';
+                if (typeof value === 'number') return 'number';
+                if (typeof value === 'boolean') return 'boolean';
+                if (typeof value === 'string') return 'string';
+                return 'unknown';
+            }
+
+            function formatValue(value) {
+                if (value === null) return 'null';
+                if (Array.isArray(value)) {
+                    if (value.length <= 10) {
+                        return `[${value.map(v => formatValue(v)).join(', ')}]`;
+                    } else {
+                        return `[${value.slice(0, 10).map(v => formatValue(v)).join(', ')}... (${value.length} items)]`;
+                    }
+                }
+                if (typeof value === 'object') {
+                    const keys = Object.keys(value);
+                    if (keys.length <= 5) {
+                        return `{${keys.map(k => `${k}: ${formatValue(value[k])}`).join(', ')}}`;
+                    } else {
+                        return `{${keys.slice(0, 5).map(k => `${k}: ${formatValue(value[k])}`).join(', ')}... (${keys.length} keys)}`;
+                    }
+                }
+                if (typeof value === 'number') {
+                    return value.toFixed(6);
+                }
+                if (typeof value === 'boolean') {
+                    return value ? 'true' : 'false';
+                }
+                if (typeof value === 'string') {
+                    return value.length > 100 ? value.substring(0, 100) + '...' : value;
+                }
+                return String(value);
+            }
+
+            function clearStatistics() {
+                document.getElementById('statisticsResults').innerHTML = `
+                    <div class="no-statistics">
+                        <p>Click "Fetch Statistics" to get simulation statistics</p>
+                        <p>Statistics will show summary data like min, max, mean, and standard deviation for simulation variables</p>
+                    </div>
+                `;
+                document.getElementById('statsSimulationId').value = '';
+                showToast('Statistics cleared', 'info');
+            }
         </script>
     </body>
     </html>
@@ -3462,6 +4355,29 @@ def api_refresh_template():
         template_id = data.get('template_id') if data else None
         
         result = refresh_agent_template(template_id)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route("/api/simulation_statistics", methods=['POST'])
+def api_simulation_statistics():
+    """API endpoint to get simulation statistics"""
+    try:
+        data = request.get_json() or {}
+        simulation_id = data.get('simulation_id')
+        wait = data.get('wait', True)
+        streams = data.get('streams')
+        
+        result = get_simulation_statistics(simulation_id, wait, streams)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route("/api/available_streams", methods=['GET'])
+def api_available_streams():
+    """API endpoint to get available streams for statistics"""
+    try:
+        result = get_available_streams()
         return jsonify(result)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
