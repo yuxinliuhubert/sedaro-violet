@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Sedaro Agent Template Editor</title>
+        <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    </head>
+    <body>
+        <!-- Toast Notification -->
+        <div id="toastNotification" class="toast-notification" style="display: none;">
+            <span class="toast-icon">✅</span>
+            <span id="toastMessage">Property updated successfully!</span>
+        </div>
+
+        <div class="container">
+            <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 2rem; gap: 15px;">
+                <img src="/violetlabsinc_logo.jpeg" alt="Violet Labs Logo" style="height: 60px; max-width: 200px; object-fit: contain;">
+                <h1 style="margin: 0; color: #c3adff; font-size: 2.5rem; font-weight: bold;">Violet Sedaro Platform</h1>
+            </div>
+            
+            <div class="simulation-controls">
+                <button id="simulateBtn" class="save-button" onclick="startSimulation()" style="background: #17a2b8;">
+                    🚀 Start Simulation
+                </button>
+                <button id="resultsBtn" class="save-button" onclick="getSimulationResults()" style="background: #6f42c1;">
+                    📊 Get Results
+                </button>
+                <button id="statsBtn" class="save-button" onclick="toggleStatisticsSection()" style="background: #20c997;">
+                    📈 Statistics
+                </button>
+                <button id="refreshBtn" class="save-button" onclick="loadBlocks()" style="background: #6c757d;">
+                    🔄 Refresh Blocks
+                </button>
+                <button id="refreshTemplateBtn" class="save-button" onclick="refreshTemplate()" style="background: #fd7e14;">
+                    🔄 Refresh Template
+                </button>
+            </div>
+            
+            <!-- Simulation Progress -->
+            <div id="simulationProgress" style="display: none;" class="simulation-progress">
+                <h3>🔄 Simulation Progress</h3>
+                <div class="progress-container">
+                    <div class="progress-bar">
+                        <div id="progressFill" class="progress-fill"></div>
+                    </div>
+                    <div id="progressText" class="progress-text">0%</div>
+                    <button id="abortBtn" class="save-button" onclick="abortSimulation()" style="background: #dc3545;">
+                        Abort
+                    </button>
+                </div>
+                <div id="statusText" class="status-text">Starting simulation...</div>
+                <div id="progressDetails" class="progress-details" style="display: none;">
+                    <div class="detail-item">
+                        <strong>Current Time:</strong> <span id="currentTime">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <strong>Time Range:</strong> <span id="timeRange">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <strong>Min Time Step:</strong> <span id="minTimeStep">-</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="loading" class="loading">Discovering blocks and properties...</div>
+            <div id="content" style="display: none;"></div>
+            <div id="simulationStatus" style="display: none;"></div>
+            
+            <!-- BOM to Simulation Spreadsheet -->
+            <div class="bom-spreadsheet">
+                <h2>BOM to Simulation Interface</h2>
+                <p>Define input variables and associate them with template properties for automatic simulation triggering:</p>
+                
+                <div class="spreadsheet-controls">
+                    <button id="addRowBtn" class="save-button" onclick="addSpreadsheetRow()" style="background: #c3adff;">
+                        ➕ Add Row
+                    </button>
+                    <button id="clearAllBtn" class="save-button" onclick="clearSpreadsheet()" style="background: #6c757d;">
+                        🗑️ Clear All
+                    </button>
+                </div>
+                
+                <div class="spreadsheet-container">
+                    <table id="bomTable" class="spreadsheet-table">
+                        <thead>
+                            <tr>
+                                <th>Variable Name</th>
+                                <th>Input Value</th>
+                                <th>Associated Template Property</th>
+                                <th>Auto-Trigger</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bomTableBody">
+                            <!-- Rows will be added here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Interactive Template Explorer -->
+            <div class="template-explorer">
+                <h2>🔍 Interactive Template Explorer</h2>
+                <p>Select a component from the dropdown and edit its properties:</p>
+                
+                <div class="component-selector">
+                    <div class="dropdown-container">
+                        <label for="componentDropdown">Select Component:</label>
+                        <div class="searchable-dropdown">
+                            <input type="text" id="searchInput" placeholder="Search components..." onkeyup="filterDropdown()">
+                            <div id="dropdownList" class="dropdown-list"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="componentEditor" style="display: none;">
+                    <div class="editor-section">
+                        <div class="editor-header">
+                            <h3 id="selectedComponentName">Component Properties</h3>
+                            <button class="close-editor-btn" onclick="closeComponentEditor()" title="Close editor">
+                                ✕
+                            </button>
+                        </div>
+                        <div id="componentProperties"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Tracked Properties Section -->
+            <div class="tracked-properties-section">
+                <h2>📊 Tracked Properties</h2>
+                <p>Properties currently being tracked and managed through the spreadsheet interface:</p>
+                
+                <div id="trackedPropertiesContainer">
+                    <!-- Tracked properties will be displayed here -->
+                </div>
+                
+                <div id="noTrackedProperties" style="display: none;">
+                    <div class="empty-state">
+                        <p>No properties are currently being tracked.</p>
+                        <p>Add variables in the spreadsheet above to start tracking properties.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Simulation Statistics Section -->
+            <div class="simulation-statistics" style="display: none;">
+                <h2>📊 Simulation Statistics</h2>
+                <p>View detailed statistics for completed simulations:</p>
+                
+                <div class="statistics-controls">
+                    <div class="control-group">
+                        <label for="statsSimulationId">Simulation ID:</label>
+                        <input type="text" id="statsSimulationId" placeholder="Enter simulation ID or leave empty for latest">
+                    </div>
+                    <div class="control-group">
+                        <label for="statsWaitToggle">Wait for Stats:</label>
+                        <label class="toggle-container-small">
+                            <input type="checkbox" id="statsWaitToggle" checked>
+                            <span class="toggle-slider-small"></span>
+                        </label>
+                    </div>
+                    <button id="fetchStatsBtn" class="save-button" onclick="fetchSimulationStats()" style="background: #17a2b8;">
+                        📊 Fetch Statistics
+                    </button>
+                    <button id="clearStatsBtn" class="save-button" onclick="clearStatistics()" style="background: #6c757d;">
+                        🗑️ Clear
+                    </button>
+                </div>
+                
+                <div id="statisticsResults" class="statistics-results">
+                    <div class="no-statistics">
+                        <p>Click "Fetch Statistics" to get simulation statistics</p>
+                        <p>Statistics will show summary data like min, max, mean, and standard deviation for simulation variables</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Edit Modal -->
+        <div id="editModal" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h3>Edit Property</h3>
+                <div id="editForm">
+                    <label for="propertyName">Property:</label>
+                    <input type="text" id="propertyName" readonly>
+                    
+                    <label for="propertyValue">New Value:</label>
+                    <input type="text" id="propertyValue">
+                    
+                    <button class="save-button" onclick="saveProperty()">Save Changes</button>
+                </div>
+                <div id="editResult"></div>
+            </div>
+        </div>
+        <script src="{{ url_for('static', filename='script.js') }}"></script>
+    </body>
+    </html>
