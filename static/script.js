@@ -1339,20 +1339,27 @@ function showPropertyDropdown(rowId) {
         // Group properties by block using the mapping
         const groupedProperties = groupPropertiesByBlock(allTemplateProperties);
         
-        // Add root properties first
-        if (groupedProperties['Root Properties']) {
-            const rootHeader = document.createElement('div');
-            rootHeader.className = 'property-item';
-            rootHeader.style = 'background: #f8f9fa; font-weight: bold; color: #495057;';
-            rootHeader.innerHTML = '<div>🌐 Root Properties</div>';
-            dropdown.appendChild(rootHeader);
+        // Add all properties in a clean, organized way without technical labels
+        Object.keys(groupedProperties).forEach(blockKey => {
+            const blockGroup = groupedProperties[blockKey];
+            const blockInfo = blockGroup.blockInfo;
             
-            groupedProperties['Root Properties'].properties.forEach(prop => {
+            // Create section header (only if it's not root properties)
+            if (blockKey !== 'root') {
+                const blockHeader = document.createElement('div');
+                blockHeader.className = 'property-item';
+                blockHeader.style = 'background: #e9ecef; font-weight: bold; color: #495057;';
+                blockHeader.innerHTML = `<div>🔧 ${blockInfo.displayName}</div>`;
+                dropdown.appendChild(blockHeader);
+            }
+            
+            // Add properties for this section
+            blockGroup.properties.forEach(prop => {
                 const item = document.createElement('div');
                 item.className = 'property-item';
                 item.style = 'padding-left: 20px;';
                 item.innerHTML = `
-                    <div>${prop.displayName}</div>
+                    <div>${prop.name || prop.displayName}</div>
                     <div class="property-path">${prop.path}</div>
                 `;
                 item.onclick = function(e) {
@@ -1362,38 +1369,6 @@ function showPropertyDropdown(rowId) {
                 };
                 dropdown.appendChild(item);
             });
-        }
-        
-        // Add block properties grouped by block name
-        Object.keys(groupedProperties).forEach(blockKey => {
-            if (blockKey !== 'Root Properties') {
-                const blockGroup = groupedProperties[blockKey];
-                const blockInfo = blockGroup.blockInfo;
-                
-                // Create block header
-                const blockHeader = document.createElement('div');
-                blockHeader.className = 'property-item';
-                blockHeader.style = 'background: #e9ecef; font-weight: bold; color: #495057;';
-                blockHeader.innerHTML = `<div>🔧 ${blockInfo.displayName}</div>`;
-                dropdown.appendChild(blockHeader);
-                
-                // Add properties for this block
-                blockGroup.properties.forEach(prop => {
-                    const item = document.createElement('div');
-                    item.className = 'property-item';
-                    item.style = 'padding-left: 20px;';
-                    item.innerHTML = `
-                        <div>${prop.name}</div>
-                        <div class="property-path">${prop.path}</div>
-                    `;
-                    item.onclick = function(e) {
-                        e.stopPropagation();
-                        console.log('Property item clicked:', prop);
-                        selectProperty(rowId, prop);
-                    };
-                    dropdown.appendChild(item);
-                });
-            }
         });
         
         // Add block components with expand functionality (for blocks that don't have drilled properties)
@@ -1402,7 +1377,7 @@ function showPropertyDropdown(rowId) {
             const compHeader = document.createElement('div');
             compHeader.className = 'property-item';
             compHeader.style = 'background: #f8f9fa; font-weight: bold; color: #495057;';
-            compHeader.innerHTML = '<div>📦 Block Components (Click to expand)</div>';
+            compHeader.innerHTML = '<div>📦 Components (Click to expand)</div>';
             dropdown.appendChild(compHeader);
             
             blockProperties.forEach(prop => {
@@ -1633,15 +1608,15 @@ function updateTrackedPropertiesDisplay() {
     let html = '';
     
     // Display root properties first
-    if (groupedTrackedProperties['Root Properties']) {
+    if (groupedTrackedProperties['root']) {
         html += `
             <div class="tracked-property-group">
                 <div class="tracked-property-group-header">
-                    <h4>🌐 Root Properties</h4>
+                    <h4>🌐 Template Properties</h4>
                 </div>
         `;
         
-        groupedTrackedProperties['Root Properties'].properties.forEach(prop => {
+        groupedTrackedProperties['root'].properties.forEach(prop => {
             const hasAutoTrigger = prop.autoTrigger && prop.value && prop.value.trim() !== '';
             
             html += `
@@ -1696,7 +1671,7 @@ function updateTrackedPropertiesDisplay() {
     
     // Display block properties grouped by block
     Object.keys(groupedTrackedProperties).forEach(blockKey => {
-        if (blockKey !== 'Root Properties') {
+        if (blockKey !== 'root') {
             const blockGroup = groupedTrackedProperties[blockKey];
             const blockInfo = blockGroup.blockInfo;
             
@@ -2098,28 +2073,38 @@ function displayStatistics(statistics, simulationId) {
         const groupedStats = groupStatisticsByAgentAndBlock(statistics, agentMapping);
         
         // Display statistics grouped by agent, then by block
-        Object.keys(groupedStats).forEach(agentName => {
+        Object.keys(groupedStats).forEach((agentName, agentIndex) => {
             const agentData = groupedStats[agentName];
+            const agentId = `agent-${agentIndex}`;
             
             html += `
                 <div class="agent-statistics-section">
-                    <h3>📊 ${agentName}</h3>
+                    <div class="agent-statistics-header" onclick="toggleSection('${agentId}')">
+                        <h3>📊 ${agentName}</h3>
+                        <span class="toggle-icon" id="toggle-${agentId}">▼</span>
+                    </div>
+                    <div class="agent-statistics-content" id="content-${agentId}">
             `;
             
             // Display root properties first (if any)
             if (agentData.rootProperties && agentData.rootProperties.length > 0) {
+                const rootId = `${agentId}-root`;
                 html += `
                     <div class="block-statistics-subsection">
-                        <h4>🌐 Root Properties</h4>
-                        <table class="statistics-table">
-                            <thead>
-                                <tr>
-                                    <th>Property</th>
-                                    <th>Value</th>
-                                    <th>Type</th>
-                                </tr>
-                            </thead>
-                            <tbody>
+                        <div class="block-statistics-header" onclick="toggleSection('${rootId}')">
+                            <h4>🌐 Template Properties (${agentData.rootProperties.length})</h4>
+                            <span class="toggle-icon" id="toggle-${rootId}">▼</span>
+                        </div>
+                        <div class="block-statistics-content" id="content-${rootId}">
+                            <table class="statistics-table">
+                                <thead>
+                                    <tr>
+                                        <th>Property</th>
+                                        <th>Value</th>
+                                        <th>Type</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
                 `;
                 
                 agentData.rootProperties.forEach(stat => {
@@ -2136,28 +2121,34 @@ function displayStatistics(statistics, simulationId) {
                 });
                 
                 html += `
-                            </tbody>
-                        </table>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 `;
             }
             
             // Display block properties grouped by block
-            Object.keys(agentData.blocks).forEach(blockName => {
+            Object.keys(agentData.blocks).forEach((blockName, blockIndex) => {
                 const blockStats = agentData.blocks[blockName];
+                const blockId = `${agentId}-block-${blockIndex}`;
                 
                 html += `
                     <div class="block-statistics-subsection">
-                        <h4>🔧 ${blockName}</h4>
-                        <table class="statistics-table">
-                            <thead>
-                                <tr>
-                                    <th>Property</th>
-                                    <th>Value</th>
-                                    <th>Type</th>
-                                </tr>
-                            </thead>
-                            <tbody>
+                        <div class="block-statistics-header" onclick="toggleSection('${blockId}')">
+                            <h4>🔧 ${blockName} (${blockStats.length})</h4>
+                            <span class="toggle-icon" id="toggle-${blockId}">▼</span>
+                        </div>
+                        <div class="block-statistics-content" id="content-${blockId}">
+                            <table class="statistics-table">
+                                <thead>
+                                    <tr>
+                                        <th>Property</th>
+                                        <th>Value</th>
+                                        <th>Type</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
                 `;
                 
                 blockStats.forEach(stat => {
@@ -2174,13 +2165,17 @@ function displayStatistics(statistics, simulationId) {
                 });
                 
                 html += `
-                            </tbody>
-                        </table>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 `;
             });
             
-            html += `</div>`;
+            html += `
+                    </div>
+                </div>
+            `;
         });
         
         resultsDiv.innerHTML = html;
@@ -2611,6 +2606,21 @@ function clearStatistics() {
     showToast('Statistics cleared', 'info');
 }
 
+function toggleSection(sectionId) {
+    const content = document.getElementById(`content-${sectionId}`);
+    const toggleIcon = document.getElementById(`toggle-${sectionId}`);
+    
+    if (content && toggleIcon) {
+        if (content.style.display === 'none') {
+            content.style.display = 'block';
+            toggleIcon.textContent = '▼';
+        } else {
+            content.style.display = 'none';
+            toggleIcon.textContent = '▶';
+        }
+    }
+}
+
 async function createBlockIdToNameMapping() {
     try {
         console.log('Creating block ID to name mapping...');
@@ -2717,18 +2727,18 @@ function groupPropertiesByBlock(properties) {
             
             grouped[blockKey].properties.push(prop);
         } else {
-            // Root properties
-            if (!grouped['Root Properties']) {
-                grouped['Root Properties'] = {
+            // Root properties - add them without a special label
+            if (!grouped['root']) {
+                grouped['root'] = {
                     blockInfo: {
-                        name: 'Root Properties',
+                        name: 'root',
                         type: 'root',
-                        displayName: 'Root Properties'
+                        displayName: 'Template Properties'
                     },
                     properties: []
                 };
             }
-            grouped['Root Properties'].properties.push(prop);
+            grouped['root'].properties.push(prop);
         }
     });
     
