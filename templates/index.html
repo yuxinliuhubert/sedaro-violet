@@ -28,6 +28,9 @@
                 <button id="statsBtn" class="save-button" onclick="toggleStatisticsSection()" style="background: #20c997;">
                     📈 Statistics
                 </button>
+                <button id="timeSeriesBtn" class="save-button" onclick="toggleTimeSeriesSection()" style="background: #e83e8c;">
+                    📈 Time Series
+                </button>
                 <button id="refreshBtn" class="save-button" onclick="loadBlocks()" style="background: #6c757d;">
                     🔄 Refresh Blocks
                 </button>
@@ -172,6 +175,55 @@
                     <div class="no-statistics">
                         <p>Click "Fetch Statistics" to get simulation statistics</p>
                         <p>Statistics will show summary data like min, max, mean, and standard deviation for simulation variables</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Time Series Visualization Section -->
+            <div class="time-series-visualization" style="display: none;">
+                <h2>📈 Time Series Visualization</h2>
+                <p>Visualize time series data like battery SOC, voltage, current, position, and velocity over time:</p>
+                
+                <div class="time-series-controls">
+                    <div class="control-group">
+                        <label for="timeSeriesSimulationId">Simulation ID:</label>
+                        <input type="text" id="timeSeriesSimulationId" placeholder="Enter simulation ID or leave empty for latest">
+                    </div>
+                    <div class="control-group">
+                        <label for="timeSeriesStartTime">Start Time (MJD):</label>
+                        <input type="number" id="timeSeriesStartTime" placeholder="Optional start time" step="0.001">
+                    </div>
+                    <div class="control-group">
+                        <label for="timeSeriesEndTime">End Time (MJD):</label>
+                        <input type="number" id="timeSeriesEndTime" placeholder="Optional end time" step="0.001">
+                    </div>
+                    <button id="loadStreamsBtn" class="save-button" onclick="loadAvailableTimeSeriesStreams()" style="background: #17a2b8;">
+                        🔍 Load Available Streams
+                    </button>
+                    <button id="clearTimeSeriesBtn" class="save-button" onclick="clearTimeSeriesData()" style="background: #6c757d;">
+                        🗑️ Clear
+                    </button>
+                </div>
+                
+                <div class="time-series-content">
+                    <div class="time-series-streams">
+                        <h3>📊 Available Time Series Data</h3>
+                        <div id="availableTimeSeriesStreams" class="available-streams">
+                            <div class="no-streams">
+                                <p>Click "Load Available Streams" to see available time series data</p>
+                                <p>Data includes battery SOC, voltage, current, position, and velocity</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="time-series-plots">
+                        <h3>📈 Time Series Plots</h3>
+                        <div id="timeSeriesPlot" class="time-series-plot">
+                            <div class="no-time-series">
+                                <p>Select a data stream and click "Plot" to visualize time series data</p>
+                                <p>Available data includes battery SOC, voltage, current, position, and velocity</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

@@ -2621,6 +2621,437 @@ function toggleSection(sectionId) {
     }
 }
 
+// Time Series Visualization Functions
+function toggleTimeSeriesSection() {
+    const timeSeriesSection = document.querySelector('.time-series-visualization');
+    if (timeSeriesSection.style.display === 'none') {
+        timeSeriesSection.style.display = 'block';
+        loadAvailableTimeSeriesStreams();
+        showToast('Time series section opened', 'info');
+    } else {
+        timeSeriesSection.style.display = 'none';
+        showToast('Time series section closed', 'info');
+    }
+}
+
+async function loadAvailableTimeSeriesStreams() {
+    const simulationId = document.getElementById('timeSeriesSimulationId').value.trim();
+    const streamsDiv = document.getElementById('availableTimeSeriesStreams');
+    
+    streamsDiv.innerHTML = '<div class="loading">Loading available time series streams...</div>';
+    
+    try {
+        const response = await fetch(`/api/available_time_series_streams?simulation_id=${simulationId || ''}`);
+        const result = await response.json();
+        
+        if (result.success) {
+            displayAvailableTimeSeriesStreams(result.available_streams);
+            showToast(`Found ${result.total_agents} agents with time series data`, 'success');
+        } else {
+            streamsDiv.innerHTML = `<div class="error">❌ Failed to load streams: ${result.error}</div>`;
+            showToast('Failed to load time series streams: ' + result.error, 'error');
+        }
+    } catch (error) {
+        streamsDiv.innerHTML = `<div class="error">❌ Error loading streams: ${error.message}</div>`;
+        showToast('Error loading time series streams: ' + error.message, 'error');
+    }
+}
+
+function displayAvailableTimeSeriesStreams(streamsData) {
+    const streamsDiv = document.getElementById('availableTimeSeriesStreams');
+    
+    if (!streamsData || !streamsData.agents || Object.keys(streamsData.agents).length === 0) {
+        streamsDiv.innerHTML = '<div class="no-streams">No time series streams available for this simulation.</div>';
+        return;
+    }
+    
+    let html = '<div class="time-series-streams-container">';
+    
+    // Display agents and their available data
+    Object.keys(streamsData.agents).forEach(agentName => {
+        const agentData = streamsData.agents[agentName];
+        
+        html += `
+            <div class="agent-streams-section">
+                <div class="agent-streams-header">
+                    <h4>🛰️ ${agentName}</h4>
+                    <span class="stream-count">${agentData.available_data.length} data streams</span>
+                </div>
+                <div class="agent-streams-content">
+        `;
+        
+        if (agentData.available_data.length > 0) {
+            agentData.available_data.forEach(data => {
+                html += `
+                    <div class="stream-item">
+                        <div class="stream-info">
+                            <div class="stream-name">${data.name}</div>
+                            <div class="stream-description">${data.description}</div>
+                            <div class="stream-components">
+                                ${data.components.map(comp => `<span class="component-badge">${comp}</span>`).join('')}
+                            </div>
+                        </div>
+                        <div class="stream-actions">
+                            <button class="plot-btn" onclick="plotTimeSeriesData('${agentName}', '${data.name}', ${JSON.stringify(data.components)})">
+                                📊 Plot
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+        } else {
+            html += '<div class="no-streams">No time series data available for this agent.</div>';
+        }
+        
+        html += `
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    streamsDiv.innerHTML = html;
+}
+
+async function plotTimeSeriesData(agentName, dataName, components) {
+    const simulationId = document.getElementById('timeSeriesSimulationId').value.trim();
+    const startTime = document.getElementById('timeSeriesStartTime').value;
+    const endTime = document.getElementById('timeSeriesEndTime').value;
+    const plotDiv = document.getElementById('timeSeriesPlot');
+    
+    plotDiv.innerHTML = '<div class="loading">Loading time series data...</div>';
+    
+    try {
+        const response = await fetch('/api/time_series_data', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                simulation_id: simulationId || null,
+                streams: null, // Get all streams for now
+                start_time: startTime ? parseFloat(startTime) : null,
+                end_time: endTime ? parseFloat(endTime) : null
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            displayTimeSeriesPlot(result.time_series_data, agentName, dataName, components);
+            showToast('Time series data loaded successfully', 'success');
+        } else {
+            plotDiv.innerHTML = `<div class="error">❌ Failed to load time series data: ${result.error}</div>`;
+            showToast('Failed to load time series data: ' + result.error, 'error');
+        }
+    } catch (error) {
+        plotDiv.innerHTML = `<div class="error">❌ Error loading time series data: ${error.message}</div>`;
+        showToast('Error loading time series data: ' + error.message, 'error');
+    }
+}
+
+function displayTimeSeriesPlot(timeSeriesData, agentName, dataName, components) {
+    const plotDiv = document.getElementById('timeSeriesPlot');
+    
+    if (!timeSeriesData || !timeSeriesData[agentName]) {
+        plotDiv.innerHTML = '<div class="error">No time series data available for the selected agent.</div>';
+        return;
+    }
+    
+    const agentData = timeSeriesData[agentName];
+    let html = `
+        <div class="time-series-plot-container">
+            <h4>📊 ${agentName} - ${dataName}</h4>
+    `;
+    
+    // Dynamically create plots for all available data
+    let plotCount = 0;
+    
+    // Iterate through all blocks in the agent data
+    for (const [blockName, blockData] of Object.entries(agentData)) {
+        if (typeof blockData === 'object' && blockData !== null) {
+            // Check if this block matches the selected data name
+            if (dataName.toLowerCase().includes(blockName.toLowerCase()) || 
+                blockName.toLowerCase().includes(dataName.toLowerCase())) {
+                
+                // Iterate through all attributes in the block
+                for (const [attrName, attrData] of Object.entries(blockData)) {
+                    if (Array.isArray(attrData) && attrData.length > 0) {
+                        // This is time series data
+                        const plotTitle = `${blockName} - ${attrName}`;
+                        const plotId = `chart-${blockName}-${attrName}`;
+                        
+                        html += createDynamicPlot(attrData, plotTitle, plotId, attrName);
+                        plotCount++;
+                    } else if (typeof attrData === 'object' && attrData !== null) {
+                        // This might be nested data (like position.eci, position.lla)
+                        for (const [nestedAttrName, nestedData] of Object.entries(attrData)) {
+                            if (Array.isArray(nestedData) && nestedData.length > 0) {
+                                const plotTitle = `${blockName} - ${attrName}.${nestedAttrName}`;
+                                const plotId = `chart-${blockName}-${attrName}-${nestedAttrName}`;
+                                
+                                html += createDynamicPlot(nestedData, plotTitle, plotId, nestedAttrName);
+                                plotCount++;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // If no specific data found, show all available data
+    if (plotCount === 0) {
+        html += '<div class="no-data">No specific data found. Showing all available time series data:</div>';
+        
+        for (const [blockName, blockData] of Object.entries(agentData)) {
+            if (typeof blockData === 'object' && blockData !== null) {
+                for (const [attrName, attrData] of Object.entries(blockData)) {
+                    if (Array.isArray(attrData) && attrData.length > 0) {
+                        const plotTitle = `${blockName} - ${attrName}`;
+                        const plotId = `chart-${blockName}-${attrName}`;
+                        
+                        html += createDynamicPlot(attrData, plotTitle, plotId, attrName);
+                    } else if (typeof attrData === 'object' && attrData !== null) {
+                        for (const [nestedAttrName, nestedData] of Object.entries(attrData)) {
+                            if (Array.isArray(nestedData) && nestedData.length > 0) {
+                                const plotTitle = `${blockName} - ${attrName}.${nestedAttrName}`;
+                                const plotId = `chart-${blockName}-${attrName}-${nestedAttrName}`;
+                                
+                                html += createDynamicPlot(nestedData, plotTitle, plotId, nestedAttrName);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    html += '</div>';
+    plotDiv.innerHTML = html;
+    
+    // Initialize charts if Chart.js is available
+    if (typeof Chart !== 'undefined') {
+        initializeTimeSeriesCharts();
+    }
+}
+
+function createBatterySOCPlot(data, title) {
+    if (!data || data.length === 0) return '';
+    
+    const chartId = 'battery-soc-chart';
+    const canvasId = `canvas-${chartId}`;
+    
+    return `
+        <div class="chart-container">
+            <h5>🔋 ${title}</h5>
+            <canvas id="${canvasId}" width="400" height="200"></canvas>
+            <div class="chart-stats">
+                <span>Min: ${Math.min(...data.map(d => d.value)).toFixed(2)}%</span>
+                <span>Max: ${Math.max(...data.map(d => d.value)).toFixed(2)}%</span>
+                <span>Avg: ${(data.reduce((sum, d) => sum + d.value, 0) / data.length).toFixed(2)}%</span>
+            </div>
+        </div>
+    `;
+}
+
+function createBatteryVoltagePlot(data, title) {
+    if (!data || data.length === 0) return '';
+    
+    const chartId = 'battery-voltage-chart';
+    const canvasId = `canvas-${chartId}`;
+    
+    return `
+        <div class="chart-container">
+            <h5>⚡ ${title}</h5>
+            <canvas id="${canvasId}" width="400" height="200"></canvas>
+            <div class="chart-stats">
+                <span>Min: ${Math.min(...data.map(d => d.value)).toFixed(2)}V</span>
+                <span>Max: ${Math.max(...data.map(d => d.value)).toFixed(2)}V</span>
+                <span>Avg: ${(data.reduce((sum, d) => sum + d.value, 0) / data.length).toFixed(2)}V</span>
+            </div>
+        </div>
+    `;
+}
+
+function createBatteryCurrentPlot(data, title) {
+    if (!data || data.length === 0) return '';
+    
+    const chartId = 'battery-current-chart';
+    const canvasId = `canvas-${chartId}`;
+    
+    return `
+        <div class="chart-container">
+            <h5>🔌 ${title}</h5>
+            <canvas id="${canvasId}" width="400" height="200"></canvas>
+            <div class="chart-stats">
+                <span>Min: ${Math.min(...data.map(d => d.value)).toFixed(2)}A</span>
+                <span>Max: ${Math.max(...data.map(d => d.value)).toFixed(2)}A</span>
+                <span>Avg: ${(data.reduce((sum, d) => sum + d.value, 0) / data.length).toFixed(2)}A</span>
+            </div>
+        </div>
+    `;
+}
+
+function createPositionPlot(data, title) {
+    if (!data || data.length === 0) return '';
+    
+    const chartId = 'position-chart';
+    const canvasId = `canvas-${chartId}`;
+    
+    return `
+        <div class="chart-container">
+            <h5>📍 ${title}</h5>
+            <canvas id="${canvasId}" width="400" height="200"></canvas>
+            <div class="chart-stats">
+                <span>X Range: ${Math.min(...data.map(d => d.value[0])).toFixed(2)} - ${Math.max(...data.map(d => d.value[0])).toFixed(2)} km</span>
+                <span>Y Range: ${Math.min(...data.map(d => d.value[1])).toFixed(2)} - ${Math.max(...data.map(d => d.value[1])).toFixed(2)} km</span>
+                <span>Z Range: ${Math.min(...data.map(d => d.value[2])).toFixed(2)} - ${Math.max(...data.map(d => d.value[2])).toFixed(2)} km</span>
+            </div>
+        </div>
+    `;
+}
+
+function createLLAPlot(data, title) {
+    if (!data || data.length === 0) return '';
+    
+    const chartId = 'lla-chart';
+    const canvasId = `canvas-${chartId}`;
+    
+    return `
+        <div class="chart-container">
+            <h5>🌍 ${title}</h5>
+            <canvas id="${canvasId}" width="400" height="200"></canvas>
+            <div class="chart-stats">
+                <span>Lat Range: ${Math.min(...data.map(d => d.value[0])).toFixed(2)}° - ${Math.max(...data.map(d => d.value[0])).toFixed(2)}°</span>
+                <span>Lon Range: ${Math.min(...data.map(d => d.value[1])).toFixed(2)}° - ${Math.max(...data.map(d => d.value[1])).toFixed(2)}°</span>
+                <span>Alt Range: ${Math.min(...data.map(d => d.value[2])).toFixed(2)} - ${Math.max(...data.map(d => d.value[2])).toFixed(2)} km</span>
+            </div>
+        </div>
+    `;
+}
+
+function createVelocityPlot(data, title) {
+    if (!data || data.length === 0) return '';
+    
+    const chartId = 'velocity-chart';
+    const canvasId = `canvas-${chartId}`;
+    
+    return `
+        <div class="chart-container">
+            <h5>🚀 ${title}</h5>
+            <canvas id="${canvasId}" width="400" height="200"></canvas>
+            <div class="chart-stats">
+                <span>X Range: ${Math.min(...data.map(d => d.value[0])).toFixed(2)} - ${Math.max(...data.map(d => d.value[0])).toFixed(2)} km/s</span>
+                <span>Y Range: ${Math.min(...data.map(d => d.value[1])).toFixed(2)} - ${Math.max(...data.map(d => d.value[1])).toFixed(2)} km/s</span>
+                <span>Z Range: ${Math.min(...data.map(d => d.value[2])).toFixed(2)} - ${Math.max(...data.map(d => d.value[2])).toFixed(2)} km/s</span>
+            </div>
+        </div>
+    `;
+}
+
+function createDynamicPlot(data, title, chartId, dataType) {
+    if (!data || data.length === 0) return '';
+    
+    const canvasId = `canvas-${chartId}`;
+    
+    // Determine the type of data and create appropriate statistics
+    let statsHtml = '';
+    let icon = '📊';
+    
+    if (data.length > 0) {
+        const firstRecord = data[0];
+        
+        if (firstRecord.value !== undefined) {
+            if (Array.isArray(firstRecord.value)) {
+                // Vector data (position, velocity, etc.)
+                const dimensions = firstRecord.value.length;
+                for (let i = 0; i < dimensions; i++) {
+                    const values = data.map(d => d.value[i]);
+                    const min = Math.min(...values);
+                    const max = Math.max(...values);
+                    const avg = values.reduce((sum, val) => sum + val, 0) / values.length;
+                    
+                    const dimensionName = ['X', 'Y', 'Z'][i] || `Dim${i+1}`;
+                    statsHtml += `<span>${dimensionName}: ${min.toFixed(2)} - ${max.toFixed(2)} (avg: ${avg.toFixed(2)})</span>`;
+                }
+                
+                // Set appropriate icon based on data type
+                if (dataType.toLowerCase().includes('position')) {
+                    icon = '📍';
+                } else if (dataType.toLowerCase().includes('velocity')) {
+                    icon = '🚀';
+                } else if (dataType.toLowerCase().includes('attitude')) {
+                    icon = '🔄';
+                }
+            } else if (typeof firstRecord.value === 'number') {
+                // Scalar data (battery SOC, voltage, etc.)
+                const values = data.map(d => d.value);
+                const min = Math.min(...values);
+                const max = Math.max(...values);
+                const avg = values.reduce((sum, val) => sum + val, 0) / values.length;
+                
+                // Set appropriate icon and units based on data type
+                let units = '';
+                if (dataType.toLowerCase().includes('soc')) {
+                    icon = '🔋';
+                    units = '%';
+                } else if (dataType.toLowerCase().includes('voltage')) {
+                    icon = '⚡';
+                    units = 'V';
+                } else if (dataType.toLowerCase().includes('current')) {
+                    icon = '🔌';
+                    units = 'A';
+                } else if (dataType.toLowerCase().includes('power')) {
+                    icon = '⚡';
+                    units = 'W';
+                } else if (dataType.toLowerCase().includes('temperature')) {
+                    icon = '🌡️';
+                    units = '°C';
+                }
+                
+                statsHtml = `
+                    <span>Min: ${min.toFixed(2)}${units}</span>
+                    <span>Max: ${max.toFixed(2)}${units}</span>
+                    <span>Avg: ${avg.toFixed(2)}${units}</span>
+                `;
+            }
+        }
+    }
+    
+    return `
+        <div class="chart-container">
+            <h5>${icon} ${title}</h5>
+            <canvas id="${canvasId}" width="400" height="200"></canvas>
+            <div class="chart-stats">
+                ${statsHtml}
+            </div>
+            <div class="chart-info">
+                <small>Data points: ${data.length} | Type: ${dataType}</small>
+            </div>
+        </div>
+    `;
+}
+
+function initializeTimeSeriesCharts() {
+    // This function would initialize Chart.js charts if the library is available
+    // For now, we'll use simple HTML/CSS visualization
+    console.log('Time series charts initialized');
+}
+
+function clearTimeSeriesData() {
+    document.getElementById('timeSeriesPlot').innerHTML = `
+        <div class="no-time-series">
+            <p>Select a data stream and click "Plot" to visualize time series data</p>
+            <p>Available data includes battery SOC, voltage, current, position, and velocity</p>
+        </div>
+    `;
+    document.getElementById('timeSeriesSimulationId').value = '';
+    document.getElementById('timeSeriesStartTime').value = '';
+    document.getElementById('timeSeriesEndTime').value = '';
+    showToast('Time series data cleared', 'info');
+}
+
 async function createBlockIdToNameMapping() {
     try {
         console.log('Creating block ID to name mapping...');
