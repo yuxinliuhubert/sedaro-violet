@@ -1024,37 +1024,83 @@ input, select, textarea {
 
 .agent-statistics-section {
     background: white;
-    padding: 1.5rem;
     border-radius: 8px;
     border: 1px solid #dee2e6;
     margin-bottom: 1.5rem;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    overflow: hidden;
 }
 
-.agent-statistics-section h3 {
-    color: #495057;
-    margin-bottom: 1rem;
+.agent-statistics-header {
+    background: linear-gradient(135deg, #c3adff 0%, #a78bfa 100%);
+    color: white;
+    padding: 1rem 1.5rem;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background-color 0.2s ease;
+}
+
+.agent-statistics-header:hover {
+    background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%);
+}
+
+.agent-statistics-header h3 {
+    color: white;
+    margin: 0;
     font-size: 1.2em;
-    border-bottom: 2px solid #c3adff;
-    padding-bottom: 0.5rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.agent-statistics-content {
+    padding: 1.5rem;
+}
+
+.toggle-icon {
+    font-size: 1.2em;
+    font-weight: bold;
+    transition: transform 0.2s ease;
 }
 
 .block-statistics-subsection {
     margin: 1rem 0;
-    padding: 1rem;
     border: 1px solid #e9ecef;
     border-radius: 6px;
     background: #f8f9fa;
+    overflow: hidden;
 }
 
-.block-statistics-subsection h4 {
+.block-statistics-header {
+    background: #e9ecef;
     color: #495057;
-    margin-bottom: 0.75rem;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background-color 0.2s ease;
+}
+
+.block-statistics-header:hover {
+    background: #dee2e6;
+}
+
+.block-statistics-header h4 {
+    color: #495057;
+    margin: 0;
     font-size: 1em;
     font-weight: 600;
     display: flex;
     align-items: center;
     gap: 0.5rem;
+}
+
+.block-statistics-content {
+    padding: 1rem;
 }
 
 .block-statistics-subsection:first-child {
@@ -1106,4 +1152,244 @@ input, select, textarea {
 .badge-unknown {
     background: #6c757d;
     color: white;
+}
+
+/* Time Series Visualization Styles */
+.time-series-visualization {
+    margin-top: 2rem;
+    padding: 1.5rem;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    background: #f8f9fa;
+}
+
+.time-series-visualization h2 {
+    color: #495057;
+    margin-bottom: 1rem;
+    font-size: 1.5em;
+}
+
+.time-series-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    align-items: end;
+}
+
+.time-series-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+}
+
+.time-series-streams {
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    background: white;
+    padding: 1rem;
+}
+
+.time-series-streams h3 {
+    color: #495057;
+    margin-bottom: 1rem;
+    font-size: 1.2em;
+}
+
+.time-series-plots {
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    background: white;
+    padding: 1rem;
+}
+
+.time-series-plots h3 {
+    color: #495057;
+    margin-bottom: 1rem;
+    font-size: 1.2em;
+}
+
+.available-streams {
+    min-height: 300px;
+}
+
+.no-streams {
+    text-align: center;
+    padding: 2rem;
+    color: #6c757d;
+    font-style: italic;
+}
+
+.time-series-plot {
+    min-height: 400px;
+}
+
+.no-time-series {
+    text-align: center;
+    padding: 2rem;
+    color: #6c757d;
+    font-style: italic;
+}
+
+.time-series-streams-container {
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.agent-streams-section {
+    margin-bottom: 1.5rem;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    background: #f8f9fa;
+    overflow: hidden;
+}
+
+.agent-streams-header {
+    background: linear-gradient(135deg, #c3adff 0%, #a78bfa 100%);
+    color: white;
+    padding: 0.75rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.agent-streams-header h4 {
+    margin: 0;
+    font-size: 1.1em;
+    font-weight: 600;
+}
+
+.stream-count {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.8em;
+    font-weight: 500;
+}
+
+.agent-streams-content {
+    padding: 1rem;
+}
+
+.stream-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    background: white;
+    margin-bottom: 0.5rem;
+}
+
+.stream-item:last-child {
+    margin-bottom: 0;
+}
+
+.stream-info {
+    flex: 1;
+}
+
+.stream-name {
+    font-weight: bold;
+    color: #495057;
+    margin-bottom: 0.25rem;
+}
+
+.stream-description {
+    font-size: 0.9em;
+    color: #6c757d;
+    margin-bottom: 0.5rem;
+}
+
+.stream-components {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.component-badge {
+    background: #e9ecef;
+    color: #495057;
+    padding: 0.2rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.7em;
+    font-weight: 500;
+}
+
+.stream-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.plot-btn {
+    background: #c3adff;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: background-color 0.2s ease;
+}
+
+.plot-btn:hover {
+    background: #a78bfa;
+}
+
+.time-series-plot-container {
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+.chart-container {
+    margin-bottom: 2rem;
+    padding: 1rem;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    background: #f8f9fa;
+}
+
+.chart-container h5 {
+    color: #495057;
+    margin-bottom: 1rem;
+    font-size: 1.1em;
+}
+
+.chart-container canvas {
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    background: white;
+    margin-bottom: 1rem;
+}
+
+.chart-stats {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    font-size: 0.9em;
+    color: #6c757d;
+}
+
+.chart-stats span {
+    background: #e9ecef;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+/* Responsive design for time series */
+@media (max-width: 768px) {
+    .time-series-content {
+        grid-template-columns: 1fr;
+    }
+    
+    .time-series-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .control-group {
+        margin-bottom: 1rem;
+    }
 }
