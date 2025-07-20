@@ -76,6 +76,7 @@ async function checkAndRestoreSimulation(simulationId) {
         console.error('Error checking simulation status:', error);
         currentSimulationId = null;
         saveState();
+        updateUseCurrentButton();
     }
 }
 
@@ -220,15 +221,28 @@ async function saveProperty() {
 }
 
 async function startSimulation() {
+    console.log('=== startSimulation called ===');
+    
     const statusDiv = document.getElementById('simulationStatus');
     const simulateBtn = document.getElementById('simulateBtn');
     const progressDiv = document.getElementById('simulationProgress');
+    
+    console.log('Status div:', statusDiv);
+    console.log('Simulate button:', simulateBtn);
+    console.log('Progress div:', progressDiv);
+    
+    if (!statusDiv || !simulateBtn || !progressDiv) {
+        console.error('Required elements not found');
+        showToast('Error: Required UI elements not found', 'error');
+        return;
+    }
     
     statusDiv.style.display = 'block';
     statusDiv.innerHTML = '<div class="loading">Starting simulation...</div>';
     simulateBtn.disabled = true;
     
     try {
+        console.log('Making request to /api/simulate...');
         const response = await fetch('/api/simulate', {
             method: 'POST',
             headers: {
@@ -236,17 +250,23 @@ async function startSimulation() {
             }
         });
         
+        console.log('Response status:', response.status);
+        console.log('Response ok:', response.ok);
+        
         const result = await response.json();
+        console.log('Response result:', result);
         
         if (result.success) {
             currentSimulationId = result.simulation_id;
+            console.log('Simulation started with ID:', currentSimulationId);
+            updateUseCurrentButton();
             
             statusDiv.innerHTML = `
                 <div class="success">
                     <h4>✅ Simulation Started Successfully!</h4>
                     <p><strong>Simulation ID:</strong> ${result.simulation_id}</p>
-                    <p><strong>Status:</strong> ${result.status}</p>
-                    <p><strong>Message:</strong> ${result.message}</p>
+                    // <p><strong>Status:</strong> ${result.status}</p>
+                    // <p><strong>Message:</strong> ${result.message}</p>
                 </div>
             `;
             
@@ -261,9 +281,11 @@ async function startSimulation() {
             
             startProgressMonitoring(result.simulation_id);
         } else {
+            console.error('Simulation failed:', result.error);
             statusDiv.innerHTML = `<div class="error">❌ Failed to start simulation: ${result.error}</div>`;
         }
     } catch (error) {
+        console.error('Error in startSimulation:', error);
         statusDiv.innerHTML = `<div class="error">❌ Error starting simulation: ${error.message}</div>`;
     } finally {
         simulateBtn.disabled = false;
@@ -360,7 +382,7 @@ async function updateProgress(simulationId) {
             if (result.is_complete) {
                 if (result.status === 'SUCCEEDED') {
                     statusText.textContent = '✅ Simulation completed successfully!';
-                    showToast('Simulation completed successfully!', 'success');
+                    showToast('Simulation Completed', 'success');
                 } else {
                     statusText.textContent = `❌ Simulation ${result.status.toLowerCase()}`;
                     showToast(`Simulation ${result.status.toLowerCase()}`, 'error');
@@ -374,6 +396,7 @@ async function updateProgress(simulationId) {
                 
                 // Reset simulation ID to allow new simulations
                 currentSimulationId = null;
+                updateUseCurrentButton();
                 
                 return true; // Stop polling
             }
@@ -442,42 +465,6 @@ async function abortSimulation() {
         }
     } catch (error) {
         showToast(`Error aborting simulation: ${error.message}`, 'error');
-    }
-}
-
-async function getSimulationResults() {
-    const statusDiv = document.getElementById('simulationStatus');
-    const resultsBtn = document.getElementById('resultsBtn');
-    
-    statusDiv.style.display = 'block';
-    statusDiv.innerHTML = '<div class="loading">Getting simulation results...</div>';
-    resultsBtn.disabled = true;
-    
-    try {
-        const response = await fetch('/api/results', {
-            method: 'GET'
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            statusDiv.innerHTML = `
-                <div class="success">
-                    <h4>📊 Simulation Results</h4>
-                    <p><strong>Status:</strong> ${result.simulation_status}</p>
-                    <p><strong>End Time:</strong> ${result.end_time}</p>
-                    <pre style="background: #f8f9fa; padding: 1rem; border-radius: 4px; overflow-x: auto;">
-${JSON.stringify(result.stats, null, 2)}
-                    </pre>
-                </div>
-            `;
-        } else {
-            statusDiv.innerHTML = `<div class="error">❌ Failed to get results: ${result.error}</div>`;
-        }
-    } catch (error) {
-        statusDiv.innerHTML = `<div class="error">❌ Error getting results: ${error.message}</div>`;
-    } finally {
-        resultsBtn.disabled = false;
     }
 }
 
@@ -1141,6 +1128,7 @@ function addSpreadsheetRow(restoreRowId = null, restoreData = null) {
         const nameInput = row.querySelector('td:nth-child(1) input');
         const valueInput = row.querySelector('td:nth-child(2) input');
         const propertyInput = row.querySelector('td:nth-child(3) input');
+        const autoTriggerCheckbox = row.querySelector('td:nth-child(4) input[type="checkbox"]');
         
         if (nameInput && restoreData.name) {
             nameInput.value = restoreData.name;
@@ -1150,6 +1138,9 @@ function addSpreadsheetRow(restoreRowId = null, restoreData = null) {
         }
         if (propertyInput && restoreData.associatedProperty) {
             propertyInput.value = restoreData.associatedProperty.displayName;
+        }
+        if (autoTriggerCheckbox && restoreData.autoTrigger !== undefined) {
+            autoTriggerCheckbox.checked = restoreData.autoTrigger;
         }
     } else {
         spreadsheetData[rowId] = {
@@ -1545,8 +1536,8 @@ function selectProperty(rowId, property) {
     // Show success message
     showToast(`Associated with ${property.displayName}`, 'success');
     
-    // Apply the current value if auto-sim is enabled
-    if (document.getElementById('autoSimToggle').checked) {
+    // Apply the current value if this specific row has auto-trigger enabled
+    if (spreadsheetData[rowId].autoTrigger && spreadsheetData[rowId].value && spreadsheetData[rowId].value.trim() !== '') {
         applySpreadsheetChanges();
     }
 }
@@ -1779,6 +1770,9 @@ function deleteTrackedProperty(rowId) {
 }
 
 async function applySpreadsheetChanges() {
+    console.log('=== applySpreadsheetChanges called ===');
+    console.log('Spreadsheet data:', spreadsheetData);
+    
     let hasChanges = false;
     let hasErrors = false;
     
@@ -1856,11 +1850,16 @@ async function applySpreadsheetChanges() {
     
     // Only trigger simulation if we actually had changes on the server AND no errors occurred
     if (hasChanges && !hasErrors) {
+        console.log('Triggering simulation due to changes...');
         setTimeout(() => {
+            console.log('Starting simulation from spreadsheet changes...');
             startSimulation();
         }, 1000); // Small delay to ensure all updates are processed
     } else if (hasErrors) {
+        console.log('Simulation skipped due to update errors');
         showToast('Simulation skipped due to update errors', 'error');
+    } else {
+        console.log('No changes detected, simulation not triggered');
     }
 }
 
@@ -2079,9 +2078,9 @@ function displayStatistics(statistics, simulationId) {
                 <div class="agent-statistics-section">
                     <div class="agent-statistics-header" onclick="toggleSection('${agentId}')">
                         <h3>📊 ${agentName}</h3>
-                        <span class="toggle-icon" id="toggle-${agentId}">▼</span>
+                        <span class="toggle-icon" id="toggle-${agentId}">▶</span>
                     </div>
-                    <div class="agent-statistics-content" id="content-${agentId}">
+                    <div class="agent-statistics-content" id="content-${agentId}", style="display: none;">
             `;
             
             // Display root properties first (if any)
@@ -2091,9 +2090,9 @@ function displayStatistics(statistics, simulationId) {
                     <div class="block-statistics-subsection">
                         <div class="block-statistics-header" onclick="toggleSection('${rootId}')">
                             <h4>🌐 Template Properties (${agentData.rootProperties.length})</h4>
-                            <span class="toggle-icon" id="toggle-${rootId}">▼</span>
+                            <span class="toggle-icon" id="toggle-${rootId}">▶</span>
                         </div>
-                        <div class="block-statistics-content" id="content-${rootId}">
+                        <div class="block-statistics-content" id="content-${rootId}" style="display: none;">
                             <table class="statistics-table">
                                 <thead>
                                     <tr>
@@ -2135,9 +2134,9 @@ function displayStatistics(statistics, simulationId) {
                     <div class="block-statistics-subsection">
                         <div class="block-statistics-header" onclick="toggleSection('${blockId}')">
                             <h4>🔧 ${blockName} (${blockStats.length})</h4>
-                            <span class="toggle-icon" id="toggle-${blockId}">▼</span>
+                            <span class="toggle-icon" id="toggle-${blockId}">▶</span>
                         </div>
-                        <div class="block-statistics-content" id="content-${blockId}">
+                        <div class="block-statistics-content" id="content-${blockId}" style="display: none;">
                             <table class="statistics-table">
                                 <thead>
                                     <tr>
@@ -2838,4 +2837,162 @@ function debugStatisticsGrouping(statistics) {
     
     console.log('=== End Statistics Debug ===');
 }
+
+// Unified Result Analysis logic
+function openResultAnalysis() {
+    const section = document.getElementById('resultAnalysisSection');
+    section.style.display = 'block';
+    
+    // Clear any previous results and show the input interface
+    const content = document.getElementById('resultAnalysisContent');
+    content.innerHTML = `
+        <div class="empty-state">
+            <p>Enter a Simulation ID above and click "Fetch Results" to analyze simulation data.</p>
+            <p>Leave the ID empty to analyze the most recent simulation.</p>
+        </div>
+    `;
+    
+    // Focus on the simulation ID input
+    const simIdInput = document.getElementById('resultAnalysisSimId');
+    if (simIdInput) {
+        simIdInput.focus();
+    }
+}
+
+// Fetch Result Analysis with specific simulation ID
+async function fetchResultAnalysis() {
+    const simIdInput = document.getElementById('resultAnalysisSimId');
+    const content = document.getElementById('resultAnalysisContent');
+    const fetchBtn = document.getElementById('fetchResultsBtn');
+    
+    const simulationId = simIdInput.value.trim();
+    
+    // Show loading state
+    content.innerHTML = '<div class="loading">Fetching results and statistics...</div>';
+    fetchBtn.disabled = true;
+    
+    try {
+        // Fetch results and statistics in parallel
+        const [resultsResponse, statsResponse] = await Promise.all([
+            fetch('/api/results' + (simulationId ? `?simulation_id=${simulationId}` : '')),
+            fetch('/api/simulation_statistics', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    simulation_id: simulationId || null,
+                    wait: false,
+                    streams: null
+                })
+            })
+        ]);
+        
+        const [results, stats] = await Promise.all([
+            resultsResponse.json(),
+            statsResponse.json()
+        ]);
+        
+        let html = '';
+        
+        // Display results
+        if (!results.success) {
+            html += `<div class="error">❌ Failed to get results: ${results.error}</div>`;
+        }
+        
+        // Insert a container for statistics
+        html += '<div id="statisticsResults"></div>';
+        
+        // Placeholder for timeseries graphing
+        // html += '<div id="timeseriesGraphPlaceholder" style="margin-top:2rem; color:#888;">[Timeseries graphing coming soon]</div>';
+        
+        content.innerHTML = html;
+        
+        // Render statistics using the advanced display
+        if (stats.success) {
+            displayStatistics(stats.statistics, stats.simulation_id);
+            showToast(`Results fetched successfully for simulation: ${stats.simulation_id || 'Latest'}`, 'success');
+        } else {
+            document.getElementById('statisticsResults').innerHTML = `<div class="statistics-error">❌ Failed to fetch statistics: ${stats.error}</div>`;
+            showToast(`Failed to fetch statistics: ${stats.error}`, 'error');
+        }
+        
+    } catch (error) {
+        content.innerHTML = `<div class="error">❌ Error fetching result analysis: ${error.message}</div>`;
+        showToast(`Error fetching results: ${error.message}`, 'error');
+    } finally {
+        fetchBtn.disabled = false;
+    }
+}
+
+// Clear Result Analysis
+function clearResultAnalysis() {
+    const content = document.getElementById('resultAnalysisContent');
+    const simIdInput = document.getElementById('resultAnalysisSimId');
+    
+    // Clear the input
+    simIdInput.value = '';
+    
+    // Reset to empty state
+    content.innerHTML = `
+        <div class="empty-state">
+            <p>Enter a Simulation ID above and click "Fetch Results" to analyze simulation data.</p>
+            <p>Leave the ID empty to analyze the most recent simulation.</p>
+        </div>
+    `;
+    
+    showToast('Results cleared', 'info');
+}
+
+// Use Current Simulation ID
+function useCurrentSimulation() {
+    const simIdInput = document.getElementById('resultAnalysisSimId');
+    
+    if (currentSimulationId) {
+        simIdInput.value = currentSimulationId;
+        showToast(`Current simulation ID (${currentSimulationId}) copied to input`, 'success');
+    } else {
+        showToast('No simulation currently running', 'info');
+    }
+}
+
+// Update the "Use Current" button state
+function updateUseCurrentButton() {
+    const useCurrentBtn = document.getElementById('useCurrentSimBtn');
+    if (useCurrentBtn) {
+        if (currentSimulationId) {
+            useCurrentBtn.disabled = false;
+            useCurrentBtn.title = `Use current simulation ID: ${currentSimulationId}`;
+        } else {
+            useCurrentBtn.disabled = true;
+            useCurrentBtn.title = 'No simulation currently running';
+        }
+    }
+}
+
+// Add keyboard support for Enter key in simulation ID input
+function setupResultAnalysisKeyboard() {
+    const simIdInput = document.getElementById('resultAnalysisSimId');
+    if (simIdInput) {
+        simIdInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                fetchResultAnalysis();
+            }
+        });
+    }
+}
+
+// Initialize application when DOM (document object model) is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    // Load saved state first
+    loadState();
+    
+    // Initialize the application
+    initializeApplication();
+    
+    // Setup keyboard support for result analysis
+    setupResultAnalysisKeyboard();
+    
+    // Update the "Use Current" button state
+    updateUseCurrentButton();
+});
 

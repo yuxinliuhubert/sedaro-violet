@@ -773,7 +773,8 @@ def api_abort_simulation():
 def api_results():
     """API endpoint to get simulation results using Sedaro client directly"""
     try:
-        result = get_simulation_results()
+        simulation_id = request.args.get('simulation_id')
+        result = get_simulation_results(simulation_id)
         return jsonify(result)
     except Exception as e:
         return jsonify({'error': str(e)}), 500

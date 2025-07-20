@@ -22,14 +22,8 @@
                 <button id="simulateBtn" class="save-button" onclick="startSimulation()" style="background: #17a2b8;">
                     🚀 Start Simulation
                 </button>
-                <button id="resultsBtn" class="save-button" onclick="getSimulationResults()" style="background: #6f42c1;">
-                    📊 Get Results
-                </button>
-                <button id="statsBtn" class="save-button" onclick="toggleStatisticsSection()" style="background: #20c997;">
-                    📈 Statistics
-                </button>
-                <button id="timeSeriesBtn" class="save-button" onclick="toggleTimeSeriesSection()" style="background: #e83e8c;">
-                    📈 Time Series
+                <button id="resultAnalysisBtn" class="save-button" onclick="openResultAnalysis()" style="background: #6f42c1;">
+                    📊 Result Analysis
                 </button>
                 <button id="refreshBtn" class="save-button" onclick="loadBlocks()" style="background: #6c757d;">
                     🔄 Refresh Blocks
@@ -37,6 +31,11 @@
                 <button id="refreshTemplateBtn" class="save-button" onclick="refreshTemplate()" style="background: #fd7e14;">
                     🔄 Refresh Template
                 </button>
+            </div>
+            
+            <!-- Simulation Status -->
+            <div id="simulationStatus" style="display: none;" class="simulation-status">
+                <!-- Status messages will be displayed here -->
             </div>
             
             <!-- Simulation Progress -->
@@ -67,7 +66,6 @@
             
             <div id="loading" class="loading">Discovering blocks and properties...</div>
             <div id="content" style="display: none;"></div>
-            <div id="simulationStatus" style="display: none;"></div>
             
             <!-- BOM to Simulation Spreadsheet -->
             <div class="bom-spreadsheet">
@@ -81,6 +79,11 @@
                     <button id="clearAllBtn" class="save-button" onclick="clearSpreadsheet()" style="background: #6c757d;">
                         🗑️ Clear All
                     </button>
+                    <!-- <label class="toggle-container">
+                        <input type="checkbox" id="autoSimToggle">
+                        <span class="toggle-slider"></span>
+                        Auto-Trigger Simulation
+                    </label> -->
                 </div>
                 
                 <div class="spreadsheet-container">
@@ -146,37 +149,37 @@
                 </div>
             </div>
             
-            <!-- Simulation Statistics Section -->
-            <div class="simulation-statistics" style="display: none;">
-                <h2>📊 Simulation Statistics</h2>
-                <p>View detailed statistics for completed simulations:</p>
+            <!-- Unified Result Analysis Section -->
+            <div class="result-analysis-section" id="resultAnalysisSection" style="display: none;">
+                <h2>📊 Result Analysis</h2>
                 
-                <div class="statistics-controls">
+                <!-- Simulation ID Input Controls -->
+                <div class="result-analysis-controls">
                     <div class="control-group">
-                        <label for="statsSimulationId">Simulation ID:</label>
-                        <input type="text" id="statsSimulationId" placeholder="Enter simulation ID or leave empty for latest">
+                        <label for="resultAnalysisSimId">Simulation ID:</label>
+                        <input type="text" id="resultAnalysisSimId" placeholder="Leave empty for most recent simulation">
                     </div>
-                    <div class="control-group">
-                        <label for="statsWaitToggle">Wait for Stats:</label>
-                        <label class="toggle-container-small">
-                            <input type="checkbox" id="statsWaitToggle" checked>
-                            <span class="toggle-slider-small"></span>
-                        </label>
+                    <div class="button-group">
+                        <button id="fetchResultsBtn" class="save-button" onclick="fetchResultAnalysis()" style="background: #6f42c1;">
+                            🔍 Fetch Results
+                        </button>
+                        <button id="clearResultsBtn" class="save-button" onclick="clearResultAnalysis()" style="background: #6c757d;">
+                            🗑️ Clear Results
+                        </button>
+                        <button id="useCurrentSimBtn" class="save-button" onclick="useCurrentSimulation()" style="background: #17a2b8;">
+                            📋 Use Current
+                        </button>
                     </div>
-                    <button id="fetchStatsBtn" class="save-button" onclick="fetchSimulationStats()" style="background: #17a2b8;">
-                        📊 Fetch Statistics
-                    </button>
-                    <button id="clearStatsBtn" class="save-button" onclick="clearStatistics()" style="background: #6c757d;">
-                        🗑️ Clear
-                    </button>
                 </div>
                 
-                <div id="statisticsResults" class="statistics-results">
-                    <div class="no-statistics">
-                        <p>Click "Fetch Statistics" to get simulation statistics</p>
-                        <p>Statistics will show summary data like min, max, mean, and standard deviation for simulation variables</p>
+                <div id="resultAnalysisContent">
+                    <div class="empty-state">
+                        <p>Enter a Simulation ID above and click "Fetch Results" to analyze simulation data.</p>
+                        <p>Leave the ID empty to analyze the most recent simulation.</p>
                     </div>
                 </div>
+                <!-- Placeholder for future timeseries graphing -->
+                <!-- <div id="timeseriesGraphPlaceholder">[Timeseries graphing coming soon]</div> -->
             </div>
         </div>
 
