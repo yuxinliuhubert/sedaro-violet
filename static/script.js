@@ -265,8 +265,7 @@ async function startSimulation() {
                 <div class="success">
                     <h4>✅ Simulation Started Successfully!</h4>
                     <p><strong>Simulation ID:</strong> ${result.simulation_id}</p>
-                    // <p><strong>Status:</strong> ${result.status}</p>
-                    // <p><strong>Message:</strong> ${result.message}</p>
+        
                 </div>
             `;
             

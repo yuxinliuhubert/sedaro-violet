@@ -386,6 +386,76 @@ input, select, textarea {
 .result-analysis-controls .save-button:disabled:hover {
     background: #6c757d !important;
 }
+
+/* Battery Chart Styles */
+.battery-chart-section {
+    margin-top: 2rem;
+    padding: 1.5rem;
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.chart-header {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #f8f9fa;
+}
+
+.chart-header h3 {
+    margin: 0;
+    color: #495057;
+    font-size: 1.4rem;
+}
+
+.chart-container {
+    text-align: center;
+    margin-bottom: 1rem;
+}
+
+.chart-container canvas {
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    background: white;
+    max-width: 100%;
+    height: auto;
+}
+
+.chart-info {
+    text-align: center;
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.chart-info p {
+    margin: 0.5rem 0;
+}
+
+.chart-info .error {
+    color: #dc3545;
+    font-weight: bold;
+}
+
+/* Animation for chart appearance */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.battery-chart-section {
+    animation: fadeIn 0.5s ease-out;
+}
+
+/* Responsive design for smaller screens */
+@media (max-width: 768px) {
+    .chart-container canvas {
+        width: 100%;
+        height: auto;
+    }
+}
+
+
 .template-explorer {
     margin-top: 3rem;
     padding: 2rem;
