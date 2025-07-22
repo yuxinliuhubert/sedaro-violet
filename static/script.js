@@ -116,8 +116,6 @@ function setupStatePersistence() {
 }
 
 async function loadBlocks() {
-    // Commented out battery block display for now
-    /*
     try {
         const response = await fetch('/api/blocks');
         const blocks = await response.json();
@@ -126,25 +124,26 @@ async function loadBlocks() {
         const loadingDiv = document.getElementById('loading');
         
         if (blocks.error) {
-            contentDiv.innerHTML = `<div class="error">Error: ${blocks.error}</div>`;
+            console.warn('Blocks API returned error:', blocks.error);
+            // Don't show error in UI since blocks are not the main interface
         } else {
-            contentDiv.innerHTML = generateBlocksHTML(blocks);
+            console.log('Successfully loaded blocks:', Object.keys(blocks));
+            // Store blocks data for potential future use
+            window.currentBlocks = blocks;
         }
         
-        loadingDiv.style.display = 'none';
-        contentDiv.style.display = 'block';
+        // Hide the loading and content divs since blocks are not the main interface
+        if (loadingDiv) loadingDiv.style.display = 'none';
+        if (contentDiv) contentDiv.style.display = 'none';
+        
     } catch (error) {
-        document.getElementById('content').innerHTML = 
-            `<div class="error">Failed to load blocks: ${error.message}</div>`;
-        document.getElementById('loading').style.display = 'none';
+        console.warn('Failed to load blocks:', error.message);
+        // Don't show error in UI since blocks are not the main interface
+        const loadingDiv = document.getElementById('loading');
+        const contentDiv = document.getElementById('content');
+        if (loadingDiv) loadingDiv.style.display = 'none';
+        if (contentDiv) contentDiv.style.display = 'none';
     }
-    */
-    
-    // Hide the loading and content divs since we're not using battery blocks
-    const loadingDiv = document.getElementById('loading');
-    const contentDiv = document.getElementById('content');
-    if (loadingDiv) loadingDiv.style.display = 'none';
-    if (contentDiv) contentDiv.style.display = 'none';
 }
 
 function generateBlocksHTML(blocks) {
@@ -481,6 +480,7 @@ window.onclick = function(event) {
 
 let allComponents = [];
 let selectedComponent = null;
+let blockSearchIndex = null; // Global search index
 
 function showToast(message, type = 'success') {
     const toast = document.getElementById('toastNotification');
@@ -1019,12 +1019,23 @@ async function initializeApplication() {
     }
 }
 
-async function refreshTemplate() {
-    const refreshBtn = document.getElementById('refreshTemplateBtn');
-    refreshBtn.disabled = true;
-    refreshBtn.textContent = '🔄 Refreshing...';
+async function refreshData() {
+    // Get both buttons and disable them
+    const refreshBlocksBtn = document.getElementById('refreshBtn');
+    const refreshTemplateBtn = document.getElementById('refreshTemplateBtn');
+    
+    // Disable both buttons and show loading state
+    if (refreshBlocksBtn) {
+        refreshBlocksBtn.disabled = true;
+        refreshBlocksBtn.textContent = '🔄 Refreshing...';
+    }
+    if (refreshTemplateBtn) {
+        refreshTemplateBtn.disabled = true;
+        refreshTemplateBtn.textContent = '🔄 Refreshing...';
+    }
     
     try {
+        // First refresh the template connection
         const response = await fetch('/api/refresh_template', {
             method: 'POST',
             headers: {
@@ -1035,25 +1046,207 @@ async function refreshTemplate() {
         const result = await response.json();
         
         if (result.success) {
-            showToast(`Template refreshed successfully! Template ID: ${result.template_id}`, 'success');
+            showToast(`Data refreshed successfully! Template ID: ${result.template_id}`, 'success');
             
-            // Reload components, blocks, and block mapping
+            // Reload all data components
             await loadComponents();
             await loadBlocks();
-            await createBlockIdToNameMapping();
+            await createBlockIdToNameMapping(); // This now creates the search index too
+            await loadTemplateProperties();
             
             // Refresh the tracked properties display with new mapping
             updateTrackedPropertiesDisplay();
+            
+            // Reinitialize spreadsheet with fresh data
+            await initializeSpreadsheet();
+            
+            // Refresh property dropdowns in existing spreadsheet rows
+            refreshSpreadsheetPropertyDropdowns();
+            
         } else {
-            showToast(`Failed to refresh template: ${result.error}`, 'error');
+            showToast(`Failed to refresh data: ${result.error}`, 'error');
         }
     } catch (error) {
-        showToast(`Error refreshing template: ${error.message}`, 'error');
+        showToast(`Error refreshing data: ${error.message}`, 'error');
     } finally {
-        refreshBtn.disabled = false;
-        refreshBtn.textContent = '🔄 Refresh Template';
+        // Re-enable both buttons and restore their text
+        if (refreshBlocksBtn) {
+            refreshBlocksBtn.disabled = false;
+            refreshBlocksBtn.textContent = '🔄 Refresh Data';
+        }
+        if (refreshTemplateBtn) {
+            refreshTemplateBtn.disabled = false;
+            refreshTemplateBtn.textContent = '🔄 Refresh All';
+        }
     }
 }
+
+// Keep the old function name for backward compatibility
+async function refreshTemplate() {
+    await refreshData();
+}
+
+function refreshSpreadsheetPropertyDropdowns() {
+    // Clear all existing property dropdowns to force refresh
+    const dropdowns = document.querySelectorAll('.property-dropdown');
+    dropdowns.forEach(dropdown => {
+        dropdown.innerHTML = '';
+    });
+    
+    // Clear property input fields to indicate they need to be reselected
+    const propertyInputs = document.querySelectorAll('.property-selector input[readonly]');
+    propertyInputs.forEach(input => {
+        input.value = '';
+        input.placeholder = 'Click to select template property (refreshed)';
+    });
+    
+    console.log('Refreshed property dropdowns in spreadsheet rows');
+}
+
+// Enhanced Block Search Index Functions
+function createBlockSearchIndex() {
+    if (blockSearchIndex) return blockSearchIndex; // Already exists
+    
+    blockSearchIndex = {
+        byName: {},
+        byType: {},
+        byPartialName: {},
+        byDisplayName: {},
+        allBlocks: []
+    };
+    
+    // Populate from existing blockIdToNameMapping
+    Object.entries(blockIdToNameMapping).forEach(([blockId, blockInfo]) => {
+        const blockEntry = {
+            blockId: blockId,
+            ...blockInfo,
+            isBlock: true,
+            hasStats: true,
+            canPlot: true
+        };
+        
+        // Index by exact name
+        blockSearchIndex.byName[blockInfo.name] = blockEntry;
+        
+        // Index by display name
+        blockSearchIndex.byDisplayName[blockInfo.displayName] = blockEntry;
+        
+        // Index by type
+        if (!blockSearchIndex.byType[blockInfo.type]) {
+            blockSearchIndex.byType[blockInfo.type] = [];
+        }
+        blockSearchIndex.byType[blockInfo.type].push(blockEntry);
+        
+        // Index by partial name matches (for fuzzy search)
+        const nameWords = blockInfo.name.toLowerCase().split(/[\s_-]+/);
+        nameWords.forEach(word => {
+            if (!blockSearchIndex.byPartialName[word]) {
+                blockSearchIndex.byPartialName[word] = [];
+            }
+            blockSearchIndex.byPartialName[word].push(blockEntry);
+        });
+        
+        // Store all blocks
+        blockSearchIndex.allBlocks.push(blockEntry);
+    });
+    
+    console.log('Created block search index with', blockSearchIndex.allBlocks.length, 'blocks');
+    return blockSearchIndex;
+}
+
+function findBlockByName(blockName) {
+    if (!blockSearchIndex) {
+        console.warn('Block search index not initialized');
+        return null;
+    }
+    
+    // Try exact name first
+    if (blockSearchIndex.byName[blockName]) {
+        return blockSearchIndex.byName[blockName];
+    }
+    
+    // Try display name
+    if (blockSearchIndex.byDisplayName[blockName]) {
+        return blockSearchIndex.byDisplayName[blockName];
+    }
+    
+    // Try partial match
+    const partialMatches = blockSearchIndex.byPartialName[blockName.toLowerCase()];
+    if (partialMatches && partialMatches.length > 0) {
+        return partialMatches[0]; // Return first match
+    }
+    
+    // Try fuzzy search
+    const fuzzyMatches = blockSearchIndex.allBlocks.filter(block => 
+        block.name.toLowerCase().includes(blockName.toLowerCase()) ||
+        block.displayName.toLowerCase().includes(blockName.toLowerCase())
+    );
+    
+    return fuzzyMatches.length > 0 ? fuzzyMatches[0] : null;
+}
+
+function findBlocksByType(blockType) {
+    if (!blockSearchIndex) {
+        console.warn('Block search index not initialized');
+        return [];
+    }
+    
+    return blockSearchIndex.byType[blockType] || [];
+}
+
+function getAllBlocks() {
+    if (!blockSearchIndex) {
+        console.warn('Block search index not initialized');
+        return [];
+    }
+    
+    return blockSearchIndex.allBlocks;
+}
+
+function searchBlocks(query) {
+    if (!blockSearchIndex) {
+        console.warn('Block search index not initialized');
+        return [];
+    }
+    
+    const lowerQuery = query.toLowerCase();
+    return blockSearchIndex.allBlocks.filter(block => 
+        block.name.toLowerCase().includes(lowerQuery) ||
+        block.displayName.toLowerCase().includes(lowerQuery) ||
+        block.type.toLowerCase().includes(lowerQuery)
+    );
+}
+
+// Utility function to test the search index
+function testBlockSearch() {
+    if (!blockSearchIndex) {
+        console.log('Block search index not available');
+        return;
+    }
+    
+    console.log('=== Block Search Index Test ===');
+    console.log('Total blocks:', blockSearchIndex.allBlocks.length);
+    console.log('Available types:', Object.keys(blockSearchIndex.byType));
+    console.log('Sample blocks:', blockSearchIndex.allBlocks.slice(0, 3));
+    
+    // Test some searches
+    const testSearches = ['Battery', 'battery', 'RCS', 'rcs', 'Power'];
+    testSearches.forEach(search => {
+        const result = findBlockByName(search);
+        console.log(`Search for "${search}":`, result ? result.name : 'Not found');
+    });
+    
+    // Test type search
+    const batteryBlocks = findBlocksByType('Battery');
+    console.log('Battery blocks:', batteryBlocks.length);
+}
+
+// Make search functions available globally for testing
+window.findBlockByName = findBlockByName;
+window.findBlocksByType = findBlocksByType;
+window.getAllBlocks = getAllBlocks;
+window.searchBlocks = searchBlocks;
+window.testBlockSearch = testBlockSearch;
 
 // BOM Spreadsheet Functions
 async function initializeSpreadsheet() {
@@ -2627,7 +2820,12 @@ async function createBlockIdToNameMapping() {
         
         if (result.success) {
             blockIdToNameMapping = extractBlockIdToNameMapping(result.data);
-            console.log('Block ID to name mapping created:', blockIdToNameMapping);
+            console.log('Block ID to name mapping created:', Object.keys(blockIdToNameMapping).length, 'blocks');
+            console.log('Sample mapping:', Object.entries(blockIdToNameMapping).slice(0, 3));
+            
+            // Create the search index after mapping is populated
+            blockSearchIndex = createBlockSearchIndex();
+            
             return blockIdToNameMapping;
         } else {
             console.error('Failed to get template structure for mapping:', result.error);
